@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#1A237E"
+    android:padding="32dp">
+
+    <TextView
+        android:text="📞 INCOMING CALL"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textColor="#90CAF9"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/tvCaller"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="36sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tvCallStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:textColor="#90CAF9"
+        android:layout_marginBottom="64dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/btnReject"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:text="✕ Reject"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#F44336"
+            android:layout_marginEnd="32dp"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btnAnswer"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:text="✓ Answer"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#4CAF50"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+
+</LinearLayout>
