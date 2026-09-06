@@ -39,19 +39,19 @@ class IncomingCallActivity : AppCompatActivity() {
         tvStatus.text = "Incoming call from Phone A"
 
         btnAnswer.setOnClickListener {
-            SocketClient.answer()
+            TransportManager.answer()
             tvStatus.text = "Connected..."
             btnAnswer.isEnabled = false
             btnReject.text = "End Call"
             btnReject.setOnClickListener {
-                SocketClient.hangup()
+                TransportManager.hangup()
                 AudioClient.stop()
                 finish()
             }
         }
 
         btnReject.setOnClickListener {
-            SocketClient.reject()
+            TransportManager.reject()
             finish()
         }
     }

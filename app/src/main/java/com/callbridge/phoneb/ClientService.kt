@@ -30,11 +30,11 @@ class ClientService : Service() {
         val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
         phoneAIp = prefs.getString("phone_a_ip", "") ?: ""
 
-        SocketClient.init(this)
-        SocketClient.onEvent = { event -> handleEvent(event) }
+        TransportManager.init(this)
+        TransportManager.onEvent = { event -> handleEvent(event) }
 
         if (phoneAIp.isNotEmpty()) {
-            SocketClient.connect(phoneAIp)
+            TransportManager.connect(phoneAIp)
         }
     }
 
@@ -42,7 +42,10 @@ class ClientService : Service() {
         Log.d(TAG, "Event: $event")
         when {
             event == "CONNECTED" -> {
-                updateNotification("✅ Connected to Phone A")
+                updateNotification("✅ Connected via ${TransportManager.activeTransportName()}")
+            }
+            event == "FALLBACK_BLUETOOTH" -> {
+                updateNotification("🔄 WiFi unavailable — trying Bluetooth...")
             }
             event == "DISCONNECTED" -> {
                 updateNotification("🔴 Disconnected — retrying...")
@@ -148,14 +151,14 @@ class ClientService : Service() {
             phoneAIp = newIp
             getSharedPreferences("callbridge", Context.MODE_PRIVATE)
                 .edit().putString("phone_a_ip", newIp).apply()
-            SocketClient.connect(newIp)
+            TransportManager.connect(newIp)
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        SocketClient.disconnect()
+        TransportManager.disconnect()
         AudioClient.stop()
     }
 

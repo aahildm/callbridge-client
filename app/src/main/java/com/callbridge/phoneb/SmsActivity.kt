@@ -37,7 +37,7 @@ class SmsActivity : AppCompatActivity() {
             val number = etTo.text.toString().trim()
             val body = etBody.text.toString().trim()
             if (number.isNotEmpty() && body.isNotEmpty()) {
-                SocketClient.sendSms(number, body)
+                TransportManager.sendSms(number, body)
                 SmsStore.add(SmsStore.Message(number, body, System.currentTimeMillis(), false))
                 adapter.addMessage(SmsStore.Message(number, body, System.currentTimeMillis(), false))
                 etBody.setText("")

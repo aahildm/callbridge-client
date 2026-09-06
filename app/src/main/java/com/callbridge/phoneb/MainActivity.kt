@@ -18,7 +18,8 @@ class MainActivity : AppCompatActivity() {
     private val PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         arrayOf(
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.POST_NOTIFICATIONS
+            Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.BLUETOOTH_CONNECT
         )
     } else {
         arrayOf(Manifest.permission.RECORD_AUDIO)
@@ -38,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         val savedIp = prefs.getString("phone_a_ip", "")
         etIp.setText(savedIp)
 
-        tvStatus.text = if (SocketClient.isConnected()) "✅ Connected" else "🔴 Not connected"
+        tvStatus.text = if (TransportManager.isConnected()) "✅ Connected" else "🔴 Not connected"
 
         btnConnect.setOnClickListener {
             val ip = etIp.text.toString().trim()
@@ -68,7 +69,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         val tvStatus = findViewById<TextView>(R.id.tvStatus)
-        tvStatus.text = if (SocketClient.isConnected()) "✅ Connected to Phone A" else "🔴 Not connected"
+        tvStatus.text = if (TransportManager.isConnected()) "✅ Connected to Phone A" else "🔴 Not connected"
     }
 
     private fun requestPermissionsIfNeeded() {
