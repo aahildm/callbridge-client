@@ -3,6 +3,7 @@ package com.callbridge.phoneb
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -13,11 +14,12 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
 
 class MainActivity : AppCompatActivity() {
 
-    private val PERMISSIONS = buildList {
+    private val REQUEST_PERMISSIONS = 100
+
+    private val REQUIRED_PERMISSIONS = buildList {
         add(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
@@ -30,8 +32,8 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var tvStatus: TextView
     private lateinit var tvTransport: TextView
+    private var batteryDialogShown = false
 
-    // Poll transport state every 2s to keep indicator fresh
     private val statusPoller = object : Runnable {
         override fun run() {
             updateTransportIndicator()
@@ -46,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         val etIp = findViewById<EditText>(R.id.etPhoneAIp)
         val btnConnect = findViewById<Button>(R.id.btnConnect)
         val btnSms = findViewById<Button>(R.id.btnOpenSms)
+        val btnBattery = findViewById<Button>(R.id.btnBatteryFix)
         tvStatus = findViewById(R.id.tvStatus)
         tvTransport = findViewById(R.id.tvTransport)
 
@@ -53,6 +56,7 @@ class MainActivity : AppCompatActivity() {
         etIp.setText(prefs.getString("phone_a_ip", ""))
 
         updateTransportIndicator()
+        updateBatteryButton(btnBattery)
 
         btnConnect.setOnClickListener {
             val ip = etIp.text.toString().trim()
@@ -76,13 +80,28 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SmsActivity::class.java))
         }
 
-        requestPermissionsIfNeeded()
+        btnBattery.setOnClickListener {
+            if (PermissionHelper.isBatteryOptimized(this)) {
+                PermissionHelper.showBatteryDialog(this)
+            } else if (PermissionHelper.isMiui()) {
+                PermissionHelper.showHyperOsGuide(this)
+            }
+        }
+
+        requestMissingPermissions()
     }
 
     override fun onResume() {
         super.onResume()
         updateTransportIndicator()
+        updateBatteryButton(findViewById(R.id.btnBatteryFix))
         handler.postDelayed(statusPoller, 2000)
+
+        // Auto-prompt battery dialog once if needed
+        if (!batteryDialogShown && PermissionHelper.isBatteryOptimized(this)) {
+            batteryDialogShown = true
+            PermissionHelper.showBatteryDialog(this)
+        }
     }
 
     override fun onPause() {
@@ -90,34 +109,58 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(statusPoller)
     }
 
+    private fun updateBatteryButton(btn: Button) {
+        val optimized = PermissionHelper.isBatteryOptimized(this)
+        val isMiui = PermissionHelper.isMiui()
+        btn.text = when {
+            optimized -> "⚠️ Fix Battery Optimization"
+            isMiui -> "📱 HyperOS Setup Guide"
+            else -> "✅ Battery Optimization OK"
+        }
+    }
+
     private fun updateTransportIndicator() {
         val connected = TransportManager.isConnected()
         val transport = TransportManager.activeTransportName()
-
         if (connected) {
             tvStatus.text = "✅ Connected to Phone A"
             tvTransport.text = when (transport) {
-                "WiFi" -> "📶 Transport: WiFi  (audio + control)"
-                "Bluetooth" -> "🔵 Transport: Bluetooth  (audio + control)"
+                "WiFi" -> "📶 WiFi  (audio + control)"
+                "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
                 else -> ""
             }
         } else {
-            if (tvStatus.text != "🔄 Connecting to ${
-                    getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-                        .getString("phone_a_ip", "")
-                }...") {
+            val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
+            val savedIp = prefs.getString("phone_a_ip", "")
+            if (tvStatus.text != "🔄 Connecting to $savedIp...") {
                 tvStatus.text = "🔴 Not connected"
             }
             tvTransport.text = ""
         }
     }
 
-    private fun requestPermissionsIfNeeded() {
-        val missing = PERMISSIONS.filter {
+    private fun requestMissingPermissions() {
+        val missing = REQUIRED_PERMISSIONS.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), REQUEST_PERMISSIONS)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_PERMISSIONS) {
+            val denied = permissions.zip(grantResults.toList())
+                .filter { it.second != PackageManager.PERMISSION_GRANTED }
+                .map { it.first }
+            if (denied.isNotEmpty()) {
+                tvStatus.text = "⚠️ Missing permissions — app may not work"
+            }
         }
     }
 }
