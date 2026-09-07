@@ -19,14 +19,15 @@ object AudioClient {
     private const val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
     private const val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
-    private const val RECEIVE_PORT = 9001  // UDP from Phone A
-    private const val SEND_PORT = 9002     // UDP to Phone A
+    private const val RECEIVE_PORT = 9001
+    private const val SEND_PORT = 9002
 
     @Volatile private var running = false
     private var sendThread: Thread? = null
     private var receiveThread: Thread? = null
+    private var btPlayer: AudioTrack? = null
 
-    // Called by TransportManager when audio chunk arrives over Bluetooth
+    // Called by BluetoothClient when AUDIO| chunk arrives
     fun onBluetoothAudio(base64Chunk: String) {
         if (!running) return
         try {
@@ -37,13 +38,11 @@ object AudioClient {
         }
     }
 
-    private var btPlayer: AudioTrack? = null
-
     fun start(phoneAIp: String) {
         if (running) return
         running = true
-
-        if (TransportManager.active == TransportManager.Active.BLUETOOTH) {
+        // Use public method instead of accessing private field
+        if (TransportManager.isBluetoothActive()) {
             startBluetooth()
         } else {
             startWifi(phoneAIp)
@@ -63,13 +62,10 @@ object AudioClient {
                 .setEncoding(ENCODING)
                 .setChannelMask(CHANNEL_OUT)
                 .build(),
-            outBufferSize,
-            AudioTrack.MODE_STREAM,
-            AudioManager.AUDIO_SESSION_ID_GENERATE
+            outBufferSize, AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE
         )
         btPlayer?.play()
 
-        // Send mic audio through Bluetooth as base64 chunks
         val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
         sendThread = Thread {
             try {
@@ -112,9 +108,7 @@ object AudioClient {
                         .setEncoding(ENCODING)
                         .setChannelMask(CHANNEL_OUT)
                         .build(),
-                    outBufferSize,
-                    AudioTrack.MODE_STREAM,
-                    AudioManager.AUDIO_SESSION_ID_GENERATE
+                    outBufferSize, AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE
                 )
                 player.play()
                 val buffer = ByteArray(outBufferSize)

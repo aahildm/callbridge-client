@@ -5,13 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
-/**
- * Picks a transport to reach Phone A: tries WiFi (SocketClient) first, and
- * if it hasn't connected within WIFI_TIMEOUT_MS, automatically falls back
- * to Bluetooth (BluetoothClient) against a paired device. Everything else
- * (ClientService, IncomingCallActivity, etc.) just calls TransportManager
- * the same way it used to call SocketClient directly.
- */
 object TransportManager {
 
     private val TAG = "CallBridge-Transport"
@@ -19,7 +12,10 @@ object TransportManager {
 
     enum class Active { NONE, WIFI, BLUETOOTH }
 
-    private var active = Active.NONE
+    // Internal state — exposed via activeTransport for AudioClient
+    internal var active = Active.NONE
+        private set
+
     private val handler = Handler(Looper.getMainLooper())
     private var fallbackRunnable: Runnable? = null
 
@@ -28,7 +24,6 @@ object TransportManager {
     fun init(context: Context) {
         SocketClient.init(context)
         BluetoothClient.init(context)
-
         SocketClient.onEvent = { event -> onTransportEvent(Active.WIFI, event) }
         BluetoothClient.onEvent = { event -> onTransportEvent(Active.BLUETOOTH, event) }
     }
@@ -43,13 +38,11 @@ object TransportManager {
 
         fallbackRunnable = Runnable {
             if (active != Active.WIFI) {
-                Log.d(TAG, "WiFi didn't connect in time — falling back to Bluetooth")
+                Log.d(TAG, "WiFi timeout — falling back to Bluetooth")
                 onEvent?.invoke("FALLBACK_BLUETOOTH")
                 SocketClient.disconnect()
                 val ok = BluetoothClient.connect()
-                if (!ok) {
-                    onEvent?.invoke("DISCONNECTED")
-                }
+                if (!ok) onEvent?.invoke("DISCONNECTED")
             }
         }
         handler.postDelayed(fallbackRunnable!!, WIFI_TIMEOUT_MS)
@@ -61,9 +54,6 @@ object TransportManager {
             cancelFallback()
             Log.d(TAG, "Connected via $from")
         }
-        // Only forward events from whichever transport is currently active,
-        // once one has been chosen — avoids stale WiFi retries leaking
-        // through after we've already switched to Bluetooth (or vice versa).
         if (active == Active.NONE || active == from) {
             onEvent?.invoke(event)
         }
@@ -84,17 +74,20 @@ object TransportManager {
     fun hangup() = send("HANGUP")
     fun sendSms(number: String, body: String) = send("SMS_SEND|$number|$body")
 
-    fun isConnected(): Boolean = when (active) {
+    fun isConnected() = when (active) {
         Active.WIFI -> SocketClient.isConnected()
         Active.BLUETOOTH -> BluetoothClient.isConnected()
         Active.NONE -> false
     }
 
-    fun activeTransportName(): String = when (active) {
+    fun activeTransportName() = when (active) {
         Active.WIFI -> "WiFi"
         Active.BLUETOOTH -> "Bluetooth"
         Active.NONE -> "None"
     }
+
+    // Expose for AudioClient to check transport type
+    fun isBluetoothActive() = active == Active.BLUETOOTH
 
     fun disconnect() {
         cancelFallback()
