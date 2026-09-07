@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.util.Base64
 import android.util.Log
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -18,21 +19,85 @@ object AudioClient {
     private const val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
     private const val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
-    private const val RECEIVE_PORT = 9001  // Receive from Phone A (call audio)
-    private const val SEND_PORT = 9002     // Send to Phone A (mic audio)
+    private const val RECEIVE_PORT = 9001  // UDP from Phone A
+    private const val SEND_PORT = 9002     // UDP to Phone A
 
     @Volatile private var running = false
     private var sendThread: Thread? = null
     private var receiveThread: Thread? = null
 
+    // Called by TransportManager when audio chunk arrives over Bluetooth
+    fun onBluetoothAudio(base64Chunk: String) {
+        if (!running) return
+        try {
+            val pcm = Base64.decode(base64Chunk, Base64.NO_WRAP)
+            btPlayer?.write(pcm, 0, pcm.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "BT audio decode error: ${e.message}")
+        }
+    }
+
+    private var btPlayer: AudioTrack? = null
+
     fun start(phoneAIp: String) {
         if (running) return
         running = true
-        Log.d(TAG, "Starting audio client, Phone A IP: $phoneAIp")
 
+        if (TransportManager.active == TransportManager.Active.BLUETOOTH) {
+            startBluetooth()
+        } else {
+            startWifi(phoneAIp)
+        }
+    }
+
+    private fun startBluetooth() {
+        Log.d(TAG, "Starting audio over Bluetooth")
+        val outBufferSize = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_OUT, ENCODING)
+        btPlayer = AudioTrack(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build(),
+            AudioFormat.Builder()
+                .setSampleRate(SAMPLE_RATE)
+                .setEncoding(ENCODING)
+                .setChannelMask(CHANNEL_OUT)
+                .build(),
+            outBufferSize,
+            AudioTrack.MODE_STREAM,
+            AudioManager.AUDIO_SESSION_ID_GENERATE
+        )
+        btPlayer?.play()
+
+        // Send mic audio through Bluetooth as base64 chunks
+        val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
+        sendThread = Thread {
+            try {
+                val recorder = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                    SAMPLE_RATE, CHANNEL_IN, ENCODING, bufferSize
+                )
+                recorder.startRecording()
+                val buffer = ByteArray(bufferSize)
+                while (running) {
+                    val read = recorder.read(buffer, 0, bufferSize)
+                    if (read > 0) {
+                        val chunk = Base64.encodeToString(buffer.copyOf(read), Base64.NO_WRAP)
+                        BluetoothClient.send("AUDIO|$chunk")
+                    }
+                }
+                recorder.stop()
+                recorder.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "BT send error: ${e.message}")
+            }
+        }.also { it.start() }
+    }
+
+    private fun startWifi(phoneAIp: String) {
+        Log.d(TAG, "Starting audio over WiFi, Phone A: $phoneAIp")
         val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
 
-        // Receive audio from Phone A → play on speaker
         receiveThread = Thread {
             try {
                 val socket = DatagramSocket(RECEIVE_PORT)
@@ -62,11 +127,10 @@ object AudioClient {
                 player.release()
                 socket.close()
             } catch (e: Exception) {
-                Log.e(TAG, "Receive error: ${e.message}")
+                Log.e(TAG, "WiFi receive error: ${e.message}")
             }
         }.also { it.start() }
 
-        // Record mic → send to Phone A
         sendThread = Thread {
             try {
                 val socket = DatagramSocket()
@@ -88,13 +152,16 @@ object AudioClient {
                 recorder.release()
                 socket.close()
             } catch (e: Exception) {
-                Log.e(TAG, "Send error: ${e.message}")
+                Log.e(TAG, "WiFi send error: ${e.message}")
             }
         }.also { it.start() }
     }
 
     fun stop() {
         running = false
+        btPlayer?.stop()
+        btPlayer?.release()
+        btPlayer = null
         sendThread?.interrupt()
         receiveThread?.interrupt()
         sendThread = null

@@ -20,14 +20,25 @@
         android:layout_height="wrap_content"
         android:textSize="14sp"
         android:textColor="#888888"
-        android:layout_marginBottom="32dp" />
+        android:layout_marginBottom="24dp" />
 
+    <!-- Connection status -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="16sp"
         android:gravity="center"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Transport indicator -->
+    <TextView
+        android:id="@+id/tvTransport"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:textColor="#888888"
         android:layout_marginBottom="24dp" />
 
     <EditText

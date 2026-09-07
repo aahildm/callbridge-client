@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -17,15 +19,25 @@ class MainActivity : AppCompatActivity() {
 
     private val PERMISSIONS = buildList {
         add(Manifest.permission.RECORD_AUDIO)
-        // POST_NOTIFICATIONS needed on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // BLUETOOTH_CONNECT needed on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_CONNECT)
         }
     }.toTypedArray()
+
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var tvStatus: TextView
+    private lateinit var tvTransport: TextView
+
+    // Poll transport state every 2s to keep indicator fresh
+    private val statusPoller = object : Runnable {
+        override fun run() {
+            updateTransportIndicator()
+            handler.postDelayed(this, 2000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,13 +46,13 @@ class MainActivity : AppCompatActivity() {
         val etIp = findViewById<EditText>(R.id.etPhoneAIp)
         val btnConnect = findViewById<Button>(R.id.btnConnect)
         val btnSms = findViewById<Button>(R.id.btnOpenSms)
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
+        tvStatus = findViewById(R.id.tvStatus)
+        tvTransport = findViewById(R.id.tvTransport)
 
         val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-        val savedIp = prefs.getString("phone_a_ip", "")
-        etIp.setText(savedIp)
+        etIp.setText(prefs.getString("phone_a_ip", ""))
 
-        tvStatus.text = if (TransportManager.isConnected()) "✅ Connected" else "🔴 Not connected"
+        updateTransportIndicator()
 
         btnConnect.setOnClickListener {
             val ip = etIp.text.toString().trim()
@@ -49,7 +61,6 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             prefs.edit().putString("phone_a_ip", ip).apply()
-
             val serviceIntent = Intent(this, ClientService::class.java)
                 .putExtra("phone_a_ip", ip)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -58,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
             }
             tvStatus.text = "🔄 Connecting to $ip..."
+            tvTransport.text = "Trying WiFi first..."
         }
 
         btnSms.setOnClickListener {
@@ -69,10 +81,34 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
-        // Don't overwrite "Connecting..." with "Not connected" right after tapping Connect
-        if (TransportManager.isConnected()) {
+        updateTransportIndicator()
+        handler.postDelayed(statusPoller, 2000)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(statusPoller)
+    }
+
+    private fun updateTransportIndicator() {
+        val connected = TransportManager.isConnected()
+        val transport = TransportManager.activeTransportName()
+
+        if (connected) {
             tvStatus.text = "✅ Connected to Phone A"
+            tvTransport.text = when (transport) {
+                "WiFi" -> "📶 Transport: WiFi  (audio + control)"
+                "Bluetooth" -> "🔵 Transport: Bluetooth  (audio + control)"
+                else -> ""
+            }
+        } else {
+            if (tvStatus.text != "🔄 Connecting to ${
+                    getSharedPreferences("callbridge", Context.MODE_PRIVATE)
+                        .getString("phone_a_ip", "")
+                }...") {
+                tvStatus.text = "🔴 Not connected"
+            }
+            tvTransport.text = ""
         }
     }
 

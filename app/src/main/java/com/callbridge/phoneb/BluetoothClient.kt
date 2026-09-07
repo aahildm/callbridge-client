@@ -36,7 +36,6 @@ object BluetoothClient {
         return adapter.bondedDevices?.firstOrNull()
     }
 
-    /** Returns true if connection attempt was started (async). */
     @SuppressLint("MissingPermission")
     fun connect(): Boolean {
         disconnect()
@@ -50,7 +49,6 @@ object BluetoothClient {
             return false
         }
 
-        // Connect on a background thread to avoid ANR
         connectThread = Thread {
             try {
                 adapter.cancelDiscovery()
@@ -90,20 +88,27 @@ object BluetoothClient {
     }
 
     private fun handleMessage(message: String) {
+        // Route audio chunks directly — avoid logging to prevent spam
+        if (message.startsWith("AUDIO|")) {
+            AudioClient.onBluetoothAudio(message.removePrefix("AUDIO|"))
+            return
+        }
+
         Log.d(TAG, "Received (BT): $message")
-        if (message == "AUTH|OK") {
-            authenticated = true
-            Log.d(TAG, "Authenticated over Bluetooth")
-            onEvent?.invoke("CONNECTED")
-            return
+        when (message) {
+            "AUTH|OK" -> {
+                authenticated = true
+                Log.d(TAG, "Authenticated over Bluetooth")
+                onEvent?.invoke("CONNECTED")
+            }
+            "AUTH|FAIL" -> {
+                Log.e(TAG, "Auth failed")
+                disconnect()
+            }
+            else -> {
+                if (authenticated) onEvent?.invoke(message)
+            }
         }
-        if (message == "AUTH|FAIL") {
-            Log.e(TAG, "Auth failed")
-            disconnect()
-            return
-        }
-        if (!authenticated) return
-        onEvent?.invoke(message)
     }
 
     private fun sendRaw(message: String) {
