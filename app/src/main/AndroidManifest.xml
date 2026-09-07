@@ -30,7 +30,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Full-screen incoming call screen -->
         <activity
             android:name=".IncomingCallActivity"
             android:exported="false"
@@ -39,18 +38,15 @@
             android:launchMode="singleTop"
             android:theme="@style/AppTheme" />
 
-        <!-- SMS inbox activity -->
         <activity
             android:name=".SmsActivity"
             android:exported="false" />
 
-        <!-- Background connection service -->
         <service
             android:name=".ClientService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
-        <!-- Boot receiver -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

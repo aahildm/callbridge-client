@@ -11,22 +11,18 @@ import java.io.InputStreamReader
 import java.io.OutputStream
 import java.util.UUID
 
-/**
- * Bluetooth RFCOMM fallback transport for Phone B. Mirrors SocketClient's
- * public interface (connect/send/answer/reject/hangup/sendSms/isConnected/
- * onEvent) so ClientService/TransportManager can treat both the same way.
- */
 object BluetoothClient {
 
     private val TAG = "CallBridge-BtClient"
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-    private const val SECRET = "callbridge123" // Must match Phone A
+    private const val SECRET = "callbridge123"
 
     private var appContext: Context? = null
     private var socket: BluetoothSocket? = null
     private var out: OutputStream? = null
     private var authenticated = false
     private var readThread: Thread? = null
+    private var connectThread: Thread? = null
 
     var onEvent: ((String) -> Unit)? = null
 
@@ -34,17 +30,13 @@ object BluetoothClient {
         appContext = context.applicationContext
     }
 
-    /** Name of a paired device to prefer, if known (e.g. saved from a prior successful connect). */
-    fun pairedDeviceName(): String? = bondedDevice()?.name
-
     @SuppressLint("MissingPermission")
     private fun bondedDevice(): BluetoothDevice? {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
-        // Assumes the phones have been paired once via Android Bluetooth settings,
-        // and that Phone A is the only (or first) bonded device.
         return adapter.bondedDevices?.firstOrNull()
     }
 
+    /** Returns true if connection attempt was started (async). */
     @SuppressLint("MissingPermission")
     fun connect(): Boolean {
         disconnect()
@@ -54,25 +46,29 @@ object BluetoothClient {
             return false
         }
         val device = bondedDevice() ?: run {
-            Log.e(TAG, "No paired device found — pair with Phone A first")
+            Log.e(TAG, "No paired device found")
             return false
         }
 
-        return try {
-            adapter.cancelDiscovery()
-            val s = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            s.connect()
-            socket = s
-            out = s.outputStream
-            authenticated = false
-            Log.d(TAG, "Connected to ${device.name} via Bluetooth — authenticating")
-            send("AUTH|$SECRET")
-            startReadLoop(s)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Bluetooth connect failed: ${e.message}")
-            false
+        // Connect on a background thread to avoid ANR
+        connectThread = Thread {
+            try {
+                adapter.cancelDiscovery()
+                val s = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                s.connect()
+                socket = s
+                out = s.outputStream
+                authenticated = false
+                Log.d(TAG, "BT connected to ${device.name} — authenticating")
+                sendRaw("AUTH|$SECRET")
+                startReadLoop(s)
+            } catch (e: Exception) {
+                Log.e(TAG, "Bluetooth connect failed: ${e.message}")
+                onEvent?.invoke("DISCONNECTED")
+            }
         }
+        connectThread?.start()
+        return true
     }
 
     private fun startReadLoop(s: BluetoothSocket) {
@@ -102,7 +98,7 @@ object BluetoothClient {
             return
         }
         if (message == "AUTH|FAIL") {
-            Log.e(TAG, "Auth failed — wrong secret")
+            Log.e(TAG, "Auth failed")
             disconnect()
             return
         }
@@ -110,7 +106,7 @@ object BluetoothClient {
         onEvent?.invoke(message)
     }
 
-    fun send(message: String) {
+    private fun sendRaw(message: String) {
         try {
             out?.write((message + "\n").toByteArray())
             out?.flush()
@@ -119,15 +115,14 @@ object BluetoothClient {
         }
     }
 
+    fun send(message: String) = sendRaw(message)
     fun answer() = send("ANSWER")
     fun reject() = send("REJECT")
     fun hangup() = send("HANGUP")
     fun sendSms(number: String, body: String) = send("SMS_SEND|$number|$body")
 
     fun disconnect() {
-        try {
-            socket?.close()
-        } catch (_: Exception) {}
+        try { socket?.close() } catch (_: Exception) {}
         socket = null
         out = null
         authenticated = false

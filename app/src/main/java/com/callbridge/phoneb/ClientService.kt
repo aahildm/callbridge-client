@@ -18,7 +18,6 @@ class ClientService : Service() {
     private val TAG = "CallBridge-ClientSvc"
     private val CHANNEL_ID = "callbridge_client"
     private val NOTIF_ID = 2
-    private val CALL_NOTIF_ID = 3
 
     private var phoneAIp = ""
 
@@ -56,20 +55,15 @@ class ClientService : Service() {
                 vibrate()
             }
             event == "ENDED" -> {
-                dismissCallNotification()
+                stopVibration()
                 AudioClient.stop()
-                // Close IncomingCallActivity if open
-                val intent = Intent(this, IncomingCallActivity::class.java)
-                intent.action = "CALL_ENDED"
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
+                // Use broadcast instead of startActivity — can't start activities from background on Android 10+
+                sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
             }
             event.startsWith("STATE|ACTIVE") -> {
-                dismissCallNotification()
                 AudioClient.start(phoneAIp)
             }
             event.startsWith("SMS_IN|") -> {
-                // SMS_IN|sender|timestamp|body
                 val parts = event.removePrefix("SMS_IN|").split("|", limit = 3)
                 if (parts.size == 3) {
                     val msg = SmsStore.Message(
@@ -96,9 +90,10 @@ class ClientService : Service() {
 
     private fun showSmsNotification(msg: SmsStore.Message) {
         val intent = Intent(this, SmsActivity::class.java)
-        val pi = PendingIntent.getActivity(this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
+        val pi = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("SMS from ${msg.sender}")
@@ -117,13 +112,8 @@ class ClientService : Service() {
                 .setAutoCancel(true)
                 .build()
         }
-
         getSystemService(NotificationManager::class.java)
             ?.notify(msg.sender.hashCode(), notif)
-    }
-
-    private fun dismissCallNotification() {
-        getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
     }
 
     private fun vibrate() {
@@ -137,6 +127,15 @@ class ClientService : Service() {
             @Suppress("DEPRECATION")
             val v = getSystemService(Vibrator::class.java)
             v?.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopVibration() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(VibratorManager::class.java)?.defaultVibrator?.cancel()
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Vibrator::class.java)?.cancel()
         }
     }
 
