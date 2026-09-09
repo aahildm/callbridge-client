@@ -25,6 +25,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         val btnForceBluetooth = view.findViewById<Button>(R.id.btnForceBluetooth)
         val tvPairedDevice = view.findViewById<TextView>(R.id.tvPairedDevice)
         val btnRestartApp = view.findViewById<Button>(R.id.btnRestartApp)
+        val btnPopupPermission = view.findViewById<Button>(R.id.btnPopupPermission)
 
         val prefs = requireContext().getSharedPreferences("callbridge", Context.MODE_PRIVATE)
         etIp.setText(prefs.getString("phone_a_ip", ""))
@@ -61,6 +62,10 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             } else if (PermissionHelper.isMiui()) {
                 PermissionHelper.showHyperOsGuide(act)
             }
+        }
+
+        btnPopupPermission.setOnClickListener {
+            PopupPermissionHelper.showPopupPermissionGuide(requireActivity())
         }
 
         btnRestartApp.setOnClickListener {

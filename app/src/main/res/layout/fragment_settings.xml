@@ -66,7 +66,17 @@
         android:text="⚠️ Fix Battery Optimization"
         android:layout_marginBottom="10dp" />
 
-    <!-- Force restart — clears any stale connection state after updates -->
+    <!-- Critical for HyperOS/MIUI — without this, incoming call popups
+         silently degrade to plain notifications -->
+    <Button
+        android:id="@+id/btnPopupPermission"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📱 Enable Call Popup Permission"
+        android:backgroundTint="#5C6BC0"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="10dp" />
+
     <Button
         android:id="@+id/btnRestartApp"
         android:layout_width="match_parent"
@@ -79,7 +89,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Enter the IP shown on Phone A's screen, then tap Connect. Use the WiFi/Bluetooth buttons to force a specific transport for testing."
+        android:text="Enter the IP shown on Phone A's screen, then tap Connect. If incoming calls only show as a notification instead of popping up, tap 'Enable Call Popup Permission' above."
         android:textSize="13sp"
         android:layout_marginTop="16dp"
         android:gravity="center"

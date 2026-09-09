@@ -82,7 +82,6 @@ class ClientService : Service() {
                 CallStateStore.update("ENDED")
                 sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
                 getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
-                // Reset shortly after so a fresh call starts clean
                 android.os.Handler(android.os.Looper.getMainLooper())
                     .postDelayed({ CallStateStore.reset() }, 1000)
             }
@@ -114,7 +113,24 @@ class ClientService : Service() {
         })
     }
 
+    private fun broadcastCallState(state: String) {
+        sendBroadcast(Intent("com.callbridge.phoneb.CALL_STATE").apply {
+            putExtra("state", state)
+        })
+    }
+
     private fun showIncomingCallNotification(number: String) {
+        // Android 14+ has an explicit toggle for full-screen intent permission
+        // that can be off even when the manifest declares USE_FULL_SCREEN_INTENT —
+        // detect it so we can tell the user exactly why the popup isn't showing.
+        if (Build.VERSION.SDK_INT >= 34) {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (nm?.canUseFullScreenIntent() == false) {
+                Log.w(TAG, "Full-screen intent permission is OFF — popup will not show")
+                broadcastStatus("⚠️ Call popup blocked — enable in Setup tab")
+            }
+        }
+
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
             putExtra("caller_number", number)
             action = "INCOMING_CALL"
@@ -152,9 +168,15 @@ class ClientService : Service() {
         }
 
         getSystemService(NotificationManager::class.java)?.notify(CALL_NOTIF_ID, notif)
+        // Always also try a direct launch — on HyperOS/MIUI the full-screen
+        // intent alone is frequently suppressed even with permission granted,
+        // but a direct startActivity from a running foreground service call
+        // often still succeeds.
         try {
             startActivity(fullScreenIntent)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "Direct launch also failed: ${e.message}")
+        }
     }
 
     private fun showSmsNotification(msg: SmsStore.Message) {
