@@ -1,8 +1,8 @@
 package com.callbridge.phoneb
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.GridLayout
@@ -20,7 +20,6 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
         val tvDialStatus = view.findViewById<TextView>(R.id.tvDialStatus)
         val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
 
-        // Wire every button inside the keypad grid to append its label
         for (i in 0 until gridKeys.childCount) {
             val child = gridKeys.getChildAt(i)
             if (child is Button) {
@@ -44,11 +43,17 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
                 return@setOnClickListener
             }
             TransportManager.send("DIAL|$number")
-            tvDialStatus.text = "📞 Calling $number via Phone A..."
+            // Launch full-screen call UI with mute/speaker/cancel, same as incoming calls
+            val intent = Intent(requireContext(), IncomingCallActivity::class.java).apply {
+                putExtra("caller_number", number)
+                putExtra("outgoing", true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            tvDialStatus.text = ""
         }
     }
 
-    /** Allows other screens (call log) to pre-fill and switch to this tab. */
     fun setNumber(number: String) {
         view?.findViewById<EditText>(R.id.etDialNumber)?.setText(number)
     }

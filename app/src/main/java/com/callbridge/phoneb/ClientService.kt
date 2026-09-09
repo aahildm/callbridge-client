@@ -38,7 +38,6 @@ class ClientService : Service() {
     }
 
     private fun handleEvent(event: String) {
-        // Skip logging full audio/calllog payloads to avoid log spam
         if (!event.startsWith("CALLLOG|")) Log.d(TAG, "Event: $event")
 
         when {
@@ -51,7 +50,6 @@ class ClientService : Service() {
                 val transport = TransportManager.activeTransportName()
                 updateNotification("✅ Connected via $transport")
                 broadcastStatus("CONNECTED|$transport")
-                // Ask for call log right after connecting in case auto-send missed it
                 TransportManager.send("GET_CALLLOG")
             }
             event == "FALLBACK_BLUETOOTH" -> {
@@ -66,9 +64,7 @@ class ClientService : Service() {
                 showIncomingCallScreen(event.removePrefix("RING|"))
                 vibrate()
             }
-            event == "STATE|DIALING" -> {
-                broadcastCallState("DIALING")
-            }
+            event == "STATE|DIALING" -> broadcastCallState("DIALING")
             event == "STATE|ACTIVE" -> {
                 AudioClient.start(phoneAIp)
                 broadcastCallState("ACTIVE")
@@ -98,6 +94,14 @@ class ClientService : Service() {
             event.startsWith("DIAL_FAIL|") -> {
                 broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
             }
+            event.startsWith("MUTE_STATE|") -> {
+                val on = event.removePrefix("MUTE_STATE|") == "ON"
+                sendBroadcast(Intent("com.callbridge.phoneb.MUTE_STATE").putExtra("muted", on))
+            }
+            event.startsWith("SPEAKER_STATE|") -> {
+                val on = event.removePrefix("SPEAKER_STATE|") == "ON"
+                sendBroadcast(Intent("com.callbridge.phoneb.SPEAKER_STATE").putExtra("on", on))
+            }
         }
     }
 
@@ -107,7 +111,6 @@ class ClientService : Service() {
         })
     }
 
-    /** Notifies IncomingCallActivity (or any listener) about call state for timer/UI updates. */
     private fun broadcastCallState(state: String) {
         sendBroadcast(Intent("com.callbridge.phoneb.CALL_STATE").apply {
             putExtra("state", state)
