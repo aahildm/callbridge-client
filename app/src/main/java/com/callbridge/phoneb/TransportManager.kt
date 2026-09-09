@@ -8,7 +8,7 @@ import android.util.Log
 object TransportManager {
 
     private val TAG = "CallBridge-Transport"
-    private const val WIFI_TIMEOUT_MS = 6000L
+    private const val WIFI_TIMEOUT_MS = 15000L
 
     enum class Active { NONE, WIFI, BLUETOOTH }
 
