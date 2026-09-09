@@ -1,13 +1,13 @@
 package com.callbridge.phoneb
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -29,15 +29,34 @@ class MainActivity : AppCompatActivity() {
         }
     }.toTypedArray()
 
-    private val handler = Handler(Looper.getMainLooper())
     private lateinit var tvStatus: TextView
     private lateinit var tvTransport: TextView
     private var batteryDialogShown = false
 
-    private val statusPoller = object : Runnable {
-        override fun run() {
-            updateTransportIndicator()
-            handler.postDelayed(this, 2000)
+    // Receives real-time status from ClientService
+    private val statusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val status = intent.getStringExtra("status") ?: return
+            when {
+                status.startsWith("CONNECTED|") -> {
+                    val transport = status.removePrefix("CONNECTED|")
+                    tvStatus.text = "✅ Connected to Phone A"
+                    tvTransport.text = when (transport) {
+                        "WiFi" -> "📶 WiFi  (audio + control)"
+                        "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
+                        else -> ""
+                    }
+                }
+                status == "DISCONNECTED" -> {
+                    tvStatus.text = "🔴 Disconnected"
+                    tvTransport.text = ""
+                }
+                else -> {
+                    // Show raw status message — e.g. error details, retry info
+                    tvStatus.text = status
+                    tvTransport.text = ""
+                }
+            }
         }
     }
 
@@ -55,7 +74,6 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
         etIp.setText(prefs.getString("phone_a_ip", ""))
 
-        updateTransportIndicator()
         updateBatteryButton(btnBattery)
 
         btnConnect.setOnClickListener {
@@ -72,8 +90,8 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(serviceIntent)
             }
-            tvStatus.text = "🔄 Connecting to $ip..."
-            tvTransport.text = "Trying WiFi first..."
+            tvStatus.text = "🔄 Starting..."
+            tvTransport.text = ""
         }
 
         btnSms.setOnClickListener {
@@ -93,11 +111,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateTransportIndicator()
         updateBatteryButton(findViewById(R.id.btnBatteryFix))
-        handler.postDelayed(statusPoller, 2000)
 
-        // Auto-prompt battery dialog once if needed
+        val filter = IntentFilter("com.callbridge.phoneb.STATUS")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(statusReceiver, filter)
+        }
+
+        // Reflect current state on resume
+        if (TransportManager.isConnected()) {
+            tvStatus.text = "✅ Connected to Phone A"
+            tvTransport.text = when (TransportManager.activeTransportName()) {
+                "WiFi" -> "📶 WiFi  (audio + control)"
+                "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
+                else -> ""
+            }
+        }
+
         if (!batteryDialogShown && PermissionHelper.isBatteryOptimized(this)) {
             batteryDialogShown = true
             PermissionHelper.showBatteryDialog(this)
@@ -106,36 +138,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        handler.removeCallbacks(statusPoller)
+        try { unregisterReceiver(statusReceiver) } catch (_: Exception) {}
     }
 
     private fun updateBatteryButton(btn: Button) {
-        val optimized = PermissionHelper.isBatteryOptimized(this)
-        val isMiui = PermissionHelper.isMiui()
         btn.text = when {
-            optimized -> "⚠️ Fix Battery Optimization"
-            isMiui -> "📱 HyperOS Setup Guide"
-            else -> "✅ Battery Optimization OK"
-        }
-    }
-
-    private fun updateTransportIndicator() {
-        val connected = TransportManager.isConnected()
-        val transport = TransportManager.activeTransportName()
-        if (connected) {
-            tvStatus.text = "✅ Connected to Phone A"
-            tvTransport.text = when (transport) {
-                "WiFi" -> "📶 WiFi  (audio + control)"
-                "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
-                else -> ""
-            }
-        } else {
-            val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-            val savedIp = prefs.getString("phone_a_ip", "")
-            if (tvStatus.text != "🔄 Connecting to $savedIp...") {
-                tvStatus.text = "🔴 Not connected"
-            }
-            tvTransport.text = ""
+            PermissionHelper.isBatteryOptimized(this) -> "⚠️ Fix Battery Optimization"
+            PermissionHelper.isMiui() -> "📱 HyperOS Setup Guide"
+            else -> "✅ Battery OK"
         }
     }
 
@@ -149,17 +159,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PERMISSIONS) {
             val denied = permissions.zip(grantResults.toList())
                 .filter { it.second != PackageManager.PERMISSION_GRANTED }
-                .map { it.first }
+                .map { it.first.substringAfterLast(".") }
             if (denied.isNotEmpty()) {
-                tvStatus.text = "⚠️ Missing permissions — app may not work"
+                tvStatus.text = "⚠️ Missing: ${denied.joinToString(", ")}"
             }
         }
     }

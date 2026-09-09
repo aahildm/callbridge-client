@@ -10,13 +10,12 @@ object SocketClient {
 
     private val TAG = "CallBridge-Client"
     private const val SECRET = "callbridge123"
+    private const val PORT = 8765
 
     private var client: WebSocketClient? = null
     private var serverIp: String = ""
-    private const val PORT = 8765
     private var appContext: Context? = null
     private var authenticated = false
-    // Flag to suppress reconnect after intentional disconnect
     @Volatile private var intentionalDisconnect = false
 
     var onEvent: ((String) -> Unit)? = null
@@ -32,35 +31,41 @@ object SocketClient {
         authenticated = false
 
         val uri = URI("ws://$ip:$PORT")
+        Log.d(TAG, "Connecting to $uri")
+        onEvent?.invoke("STATUS|Connecting to $ip:$PORT...")
+
         client = object : WebSocketClient(uri) {
 
             override fun onOpen(handshake: ServerHandshake) {
-                Log.d(TAG, "Connected to Phone A — authenticating")
+                Log.d(TAG, "TCP connected — sending auth")
+                onEvent?.invoke("STATUS|Connected — authenticating...")
                 send("AUTH|$SECRET")
             }
 
             override fun onMessage(message: String) {
                 Log.d(TAG, "Received: $message")
-
-                if (message == "AUTH|OK") {
-                    authenticated = true
-                    Log.d(TAG, "Authenticated successfully")
-                    onEvent?.invoke("CONNECTED")
-                    return
+                when (message) {
+                    "AUTH|OK" -> {
+                        authenticated = true
+                        Log.d(TAG, "Auth OK")
+                        onEvent?.invoke("CONNECTED")
+                    }
+                    "AUTH|FAIL" -> {
+                        Log.e(TAG, "Auth failed — wrong secret")
+                        onEvent?.invoke("STATUS|Auth failed — wrong secret key")
+                        close()
+                    }
+                    else -> {
+                        if (authenticated) onEvent?.invoke(message)
+                    }
                 }
-                if (message == "AUTH|FAIL") {
-                    Log.e(TAG, "Auth failed — wrong secret")
-                    close()
-                    return
-                }
-
-                if (!authenticated) return
-                onEvent?.invoke(message)
             }
 
             override fun onClose(code: Int, reason: String, remote: Boolean) {
-                Log.d(TAG, "Disconnected ($reason)")
+                Log.d(TAG, "Disconnected: code=$code reason=$reason remote=$remote")
                 authenticated = false
+                val detail = if (reason.isNotEmpty()) reason else "code $code"
+                onEvent?.invoke("STATUS|Disconnected ($detail)")
                 onEvent?.invoke("DISCONNECTED")
                 if (!intentionalDisconnect && serverIp.isNotEmpty()) {
                     scheduleReconnect()
@@ -68,23 +73,23 @@ object SocketClient {
             }
 
             override fun onError(ex: Exception) {
-                Log.e(TAG, "WebSocket error: ${ex.message}")
+                Log.e(TAG, "WebSocket error: ${ex.javaClass.simpleName}: ${ex.message}")
+                onEvent?.invoke("STATUS|Error: ${ex.javaClass.simpleName}: ${ex.message}")
             }
         }
 
         try {
             client?.connect()
         } catch (e: Exception) {
-            Log.e(TAG, "Connect failed: ${e.message}")
+            Log.e(TAG, "Connect exception: ${e.message}")
+            onEvent?.invoke("STATUS|Failed to connect: ${e.message}")
             if (!intentionalDisconnect) scheduleReconnect()
         }
     }
 
     fun send(message: String) {
         try {
-            if (client?.isOpen == true) {
-                client?.send(message)
-            }
+            if (client?.isOpen == true) client?.send(message)
         } catch (e: Exception) {
             Log.e(TAG, "Send failed: ${e.message}")
         }
@@ -97,15 +102,12 @@ object SocketClient {
 
     fun disconnect() {
         intentionalDisconnect = true
-        try {
-            client?.close()
-            client = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Disconnect error: ${e.message}")
-        }
+        try { client?.close() } catch (_: Exception) {}
+        client = null
     }
 
     private fun scheduleReconnect() {
+        onEvent?.invoke("STATUS|Retrying in 5s...")
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             if (!intentionalDisconnect && serverIp.isNotEmpty()) {
                 Log.d(TAG, "Reconnecting to $serverIp")

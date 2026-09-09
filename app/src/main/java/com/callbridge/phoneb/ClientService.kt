@@ -24,7 +24,7 @@ class ClientService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIF_ID, buildStatusNotification("Connecting..."))
+        startForeground(NOTIF_ID, buildNotification("Starting..."))
 
         val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
         phoneAIp = prefs.getString("phone_a_ip", "") ?: ""
@@ -40,14 +40,24 @@ class ClientService : Service() {
     private fun handleEvent(event: String) {
         Log.d(TAG, "Event: $event")
         when {
+            // Show detailed status messages in notification
+            event.startsWith("STATUS|") -> {
+                val msg = event.removePrefix("STATUS|")
+                updateNotification(msg)
+                broadcastStatus(msg)
+            }
             event == "CONNECTED" -> {
-                updateNotification("✅ Connected via ${TransportManager.activeTransportName()}")
+                val transport = TransportManager.activeTransportName()
+                updateNotification("✅ Connected via $transport")
+                broadcastStatus("CONNECTED|$transport")
             }
             event == "FALLBACK_BLUETOOTH" -> {
-                updateNotification("🔄 WiFi unavailable — trying Bluetooth...")
+                updateNotification("🔄 WiFi failed — trying Bluetooth...")
+                broadcastStatus("WiFi failed — trying Bluetooth...")
             }
             event == "DISCONNECTED" -> {
                 updateNotification("🔴 Disconnected — retrying...")
+                broadcastStatus("DISCONNECTED")
             }
             event.startsWith("RING|") -> {
                 val number = event.removePrefix("RING|")
@@ -57,7 +67,6 @@ class ClientService : Service() {
             event == "ENDED" -> {
                 stopVibration()
                 AudioClient.stop()
-                // Use broadcast instead of startActivity — can't start activities from background on Android 10+
                 sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
             }
             event.startsWith("STATE|ACTIVE") -> {
@@ -79,6 +88,13 @@ class ClientService : Service() {
         }
     }
 
+    // Send status to MainActivity via broadcast so UI updates in real time
+    private fun broadcastStatus(status: String) {
+        sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply {
+            putExtra("status", status)
+        })
+    }
+
     private fun showIncomingCallScreen(number: String) {
         val intent = Intent(this, IncomingCallActivity::class.java).apply {
             putExtra("caller_number", number)
@@ -94,24 +110,13 @@ class ClientService : Service() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("SMS from ${msg.sender}")
-                .setContentText(msg.body)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
-                .setContentIntent(pi)
-                .setAutoCancel(true)
-                .build()
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-                .setContentTitle("SMS from ${msg.sender}")
-                .setContentText(msg.body)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
-                .setContentIntent(pi)
-                .setAutoCancel(true)
-                .build()
-        }
+        val notif = buildNotifBuilder()
+            .setContentTitle("SMS from ${msg.sender}")
+            .setContentText(msg.body)
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
         getSystemService(NotificationManager::class.java)
             ?.notify(msg.sender.hashCode(), notif)
     }
@@ -119,14 +124,11 @@ class ClientService : Service() {
     private fun vibrate() {
         val pattern = longArrayOf(0, 500, 500, 500, 500, 500)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = getSystemService(VibratorManager::class.java)
-            vm?.defaultVibrator?.vibrate(
-                android.os.VibrationEffect.createWaveform(pattern, 0)
-            )
+            getSystemService(VibratorManager::class.java)?.defaultVibrator
+                ?.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0))
         } else {
             @Suppress("DEPRECATION")
-            val v = getSystemService(Vibrator::class.java)
-            v?.vibrate(pattern, 0)
+            getSystemService(Vibrator::class.java)?.vibrate(pattern, 0)
         }
     }
 
@@ -140,8 +142,8 @@ class ClientService : Service() {
     }
 
     private fun updateNotification(text: String) {
-        val notif = buildStatusNotification(text)
-        getSystemService(NotificationManager::class.java)?.notify(NOTIF_ID, notif)
+        getSystemService(NotificationManager::class.java)
+            ?.notify(NOTIF_ID, buildNotification(text))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -176,22 +178,23 @@ class ClientService : Service() {
         }
     }
 
-    private fun buildStatusNotification(text: String): Notification {
+    private fun buildNotifBuilder(): Notification.Builder {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("CallBridge")
-                .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_menu_call)
                 .setOngoing(true)
-                .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setContentTitle("CallBridge")
-                .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_menu_call)
                 .setOngoing(true)
-                .build()
         }
+    }
+
+    private fun buildNotification(text: String): Notification {
+        return buildNotifBuilder()
+            .setContentTitle("CallBridge")
+            .setContentText(text)
+            .build()
     }
 }
