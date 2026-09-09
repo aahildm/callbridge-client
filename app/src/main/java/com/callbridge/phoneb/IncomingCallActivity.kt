@@ -20,6 +20,7 @@ class IncomingCallActivity : AppCompatActivity() {
     private var callStartTime = 0L
     private var timerRunning = false
     private var isOutgoing = false
+    private var onHold = false
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var tvCallStatus: TextView
@@ -30,6 +31,7 @@ class IncomingCallActivity : AppCompatActivity() {
     private lateinit var rowInCallControls: View
     private lateinit var btnMute: Button
     private lateinit var btnSpeaker: Button
+    private lateinit var btnHold: Button
 
     private val timerRunnable = object : Runnable {
         override fun run() {
@@ -54,6 +56,9 @@ class IncomingCallActivity : AppCompatActivity() {
                     btnReject.text = "End Call"
                     rowInCallControls.visibility = View.VISIBLE
                     startTimer()
+                }
+                "HOLDING" -> {
+                    tvCallStatus.text = "On hold"
                 }
                 "ENDED" -> {
                     stopTimer()
@@ -104,6 +109,7 @@ class IncomingCallActivity : AppCompatActivity() {
         rowInCallControls = findViewById(R.id.rowInCallControls)
         btnMute = findViewById(R.id.btnMute)
         btnSpeaker = findViewById(R.id.btnSpeaker)
+        btnHold = findViewById(R.id.btnHold)
 
         tvCaller.text = callerNumber
 
@@ -133,8 +139,6 @@ class IncomingCallActivity : AppCompatActivity() {
                 }
                 "Cancel" -> {
                     TransportManager.send("CANCEL_DIAL")
-                    // Give the server a moment, then close regardless —
-                    // ClientService will also close this via ENDED if it arrives first
                     handler.postDelayed({ finish() }, 300)
                 }
                 else -> {
@@ -144,8 +148,6 @@ class IncomingCallActivity : AppCompatActivity() {
             }
         }
 
-        // Local mute/speaker control — affects Phone B's own mic and speaker,
-        // not Phone A's hardware.
         btnMute.setOnClickListener {
             val nowMuted = CallAudioController.toggleMute()
             btnMute.text = if (nowMuted) "🎤 Unmute" else "🎤 Mute"
@@ -153,7 +155,14 @@ class IncomingCallActivity : AppCompatActivity() {
 
         btnSpeaker.setOnClickListener {
             val nowOn = CallAudioController.toggleSpeaker()
-            btnSpeaker.text = if (nowOn) "🔊 Speaker On" else "🔊 Speaker"
+            btnSpeaker.text = if (nowOn) "🔊 On" else "🔊 Speaker"
+        }
+
+        btnHold.setOnClickListener {
+            onHold = !onHold
+            TransportManager.send(if (onHold) "HOLD" else "UNHOLD")
+            btnHold.text = if (onHold) "▶ Resume" else "⏸ Hold"
+            tvCallStatus.text = if (onHold) "On hold" else "Connected"
         }
 
         val filter = IntentFilter("com.callbridge.phoneb.CALL_ENDED")

@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:gravity="center"
     android:background="#1A237E"
-    android:padding="32dp">
+    android:padding="24dp">
 
     <TextView
         android:id="@+id/tvCallLabel"
@@ -14,13 +14,13 @@
         android:layout_height="wrap_content"
         android:textSize="18sp"
         android:textColor="#90CAF9"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="12dp" />
 
     <TextView
         android:id="@+id/tvCaller"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="36sp"
+        android:textSize="32sp"
         android:textColor="#FFFFFF"
         android:textStyle="bold"
         android:layout_marginBottom="8dp" />
@@ -37,36 +37,44 @@
         android:id="@+id/tvTimer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="24sp"
+        android:textSize="22sp"
         android:textColor="#FFFFFF"
         android:fontFamily="monospace"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="24dp"
         android:visibility="gone" />
 
-    <!-- Mute/Speaker row, only visible once call is active -->
+    <!-- Mute / Speaker / Hold row — visible once call is ACTIVE -->
     <LinearLayout
         android:id="@+id/rowInCallControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="24dp"
         android:visibility="gone">
 
         <Button
             android:id="@+id/btnMute"
-            android:layout_width="90dp"
-            android:layout_height="70dp"
+            android:layout_width="80dp"
+            android:layout_height="64dp"
             android:text="🎤 Mute"
-            android:textSize="12sp"
-            android:layout_marginEnd="16dp" />
+            android:textSize="11sp"
+            android:layout_marginEnd="10dp" />
 
         <Button
             android:id="@+id/btnSpeaker"
-            android:layout_width="90dp"
-            android:layout_height="70dp"
+            android:layout_width="80dp"
+            android:layout_height="64dp"
             android:text="🔊 Speaker"
-            android:textSize="12sp" />
+            android:textSize="11sp"
+            android:layout_marginEnd="10dp" />
+
+        <Button
+            android:id="@+id/btnHold"
+            android:layout_width="80dp"
+            android:layout_height="64dp"
+            android:text="⏸ Hold"
+            android:textSize="11sp" />
 
     </LinearLayout>
 
@@ -78,22 +86,22 @@
 
         <Button
             android:id="@+id/btnReject"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
             android:text="✕ Reject"
             android:textColor="#FFFFFF"
             android:backgroundTint="#F44336"
-            android:layout_marginEnd="32dp"
-            android:textSize="16sp" />
+            android:layout_marginEnd="24dp"
+            android:textSize="15sp" />
 
         <Button
             android:id="@+id/btnAnswer"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
             android:text="✓ Answer"
             android:textColor="#FFFFFF"
             android:backgroundTint="#4CAF50"
-            android:textSize="16sp" />
+            android:textSize="15sp" />
 
     </LinearLayout>
 

@@ -19,14 +19,15 @@ object SmsStore {
 
     fun getAll(): List<Message> = messages.toList()
 
-    /** All messages to/from a specific number, oldest first for thread display. */
+    /** All messages to/from a specific number (normalized match), oldest first. */
     fun getThread(contact: String): List<Message> =
-        messages.filter { it.sender == contact }.sortedBy { it.timestamp }
+        messages.filter { PhoneNumberUtils.sameNumber(it.sender, contact) }
+            .sortedBy { it.timestamp }
 
-    /** One entry per contact, with their most recent message, newest conversation first. */
+    /** One entry per normalized number, using their most recent message. */
     fun getConversations(): List<Message> =
         messages
-            .groupBy { it.sender }
+            .groupBy { PhoneNumberUtils.normalize(it.sender) }
             .map { (_, msgs) -> msgs.maxByOrNull { it.timestamp }!! }
             .sortedByDescending { it.timestamp }
 }

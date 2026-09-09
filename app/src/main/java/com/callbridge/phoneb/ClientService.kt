@@ -69,6 +69,7 @@ class ClientService : Service() {
                 AudioClient.start(phoneAIp)
                 broadcastCallState("ACTIVE")
             }
+            event == "STATE|HOLDING" -> broadcastCallState("HOLDING")
             event == "ENDED" -> {
                 stopVibration()
                 AudioClient.stop()
@@ -93,14 +94,6 @@ class ClientService : Service() {
             }
             event.startsWith("DIAL_FAIL|") -> {
                 broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
-            }
-            event.startsWith("MUTE_STATE|") -> {
-                val on = event.removePrefix("MUTE_STATE|") == "ON"
-                sendBroadcast(Intent("com.callbridge.phoneb.MUTE_STATE").putExtra("muted", on))
-            }
-            event.startsWith("SPEAKER_STATE|") -> {
-                val on = event.removePrefix("SPEAKER_STATE|") == "ON"
-                sendBroadcast(Intent("com.callbridge.phoneb.SPEAKER_STATE").putExtra("on", on))
             }
         }
     }

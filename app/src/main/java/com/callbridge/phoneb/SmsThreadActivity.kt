@@ -14,7 +14,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Shows the full message thread with one contact, with a compose bar at the bottom. */
 class SmsThreadActivity : AppCompatActivity() {
 
     private lateinit var number: String
@@ -38,7 +37,7 @@ class SmsThreadActivity : AppCompatActivity() {
         scrollToBottom()
 
         SmsStore.onNewMessage = { msg ->
-            if (msg.sender == number) {
+            if (PhoneNumberUtils.sameNumber(msg.sender, number)) {
                 runOnUiThread {
                     adapter.update(SmsStore.getThread(number))
                     scrollToBottom()
@@ -94,7 +93,6 @@ class ThreadAdapter(private var messages: List<SmsStore.Message>) :
         holder.tvBody.text = msg.body
         holder.tvTime.text = timeFormat.format(Date(msg.timestamp))
 
-        val params = holder.tvBody.layoutParams as android.widget.LinearLayout.LayoutParams
         if (msg.incoming) {
             holder.tvBody.setBackgroundColor(0xFFE0E0E0.toInt())
             (holder.container as android.widget.LinearLayout).gravity = android.view.Gravity.START
