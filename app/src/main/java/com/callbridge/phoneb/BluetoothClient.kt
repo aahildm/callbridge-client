@@ -36,18 +36,30 @@ object BluetoothClient {
         return adapter.bondedDevices?.firstOrNull()
     }
 
+    /**
+     * Attempts a Bluetooth connection. Returns true only if the attempt was
+     * actually started — callers should watch onEvent for the real outcome
+     * ("CONNECTED" or a "STATUS|..." failure reason), since connect() itself
+     * runs asynchronously on a background thread.
+     */
     @SuppressLint("MissingPermission")
     fun connect(): Boolean {
         disconnect()
         val adapter = BluetoothAdapter.getDefaultAdapter()
-        if (adapter == null || !adapter.isEnabled) {
-            Log.e(TAG, "Bluetooth unavailable or disabled")
+        if (adapter == null) {
+            onEvent?.invoke("STATUS|No Bluetooth adapter on this device")
+            return false
+        }
+        if (!adapter.isEnabled) {
+            onEvent?.invoke("STATUS|Bluetooth is turned off — enable it in settings")
             return false
         }
         val device = bondedDevice() ?: run {
-            Log.e(TAG, "No paired device found")
+            onEvent?.invoke("STATUS|No paired device — pair with Phone A in Bluetooth settings first")
             return false
         }
+
+        onEvent?.invoke("STATUS|Connecting to ${device.name} via Bluetooth...")
 
         connectThread = Thread {
             try {
@@ -58,10 +70,12 @@ object BluetoothClient {
                 out = s.outputStream
                 authenticated = false
                 Log.d(TAG, "BT connected to ${device.name} — authenticating")
+                onEvent?.invoke("STATUS|Connected — authenticating...")
                 sendRaw("AUTH|$SECRET")
                 startReadLoop(s)
             } catch (e: Exception) {
                 Log.e(TAG, "Bluetooth connect failed: ${e.message}")
+                onEvent?.invoke("STATUS|Bluetooth connect failed: ${e.message ?: "unknown error"}")
                 onEvent?.invoke("DISCONNECTED")
             }
         }
@@ -88,7 +102,6 @@ object BluetoothClient {
     }
 
     private fun handleMessage(message: String) {
-        // Route audio chunks directly — avoid logging to prevent spam
         if (message.startsWith("AUDIO|")) {
             AudioClient.onBluetoothAudio(message.removePrefix("AUDIO|"))
             return
@@ -103,6 +116,7 @@ object BluetoothClient {
             }
             "AUTH|FAIL" -> {
                 Log.e(TAG, "Auth failed")
+                onEvent?.invoke("STATUS|Bluetooth auth failed — secret mismatch")
                 disconnect()
             }
             else -> {
