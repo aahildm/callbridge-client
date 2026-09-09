@@ -9,11 +9,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,7 +33,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTransport: TextView
     private var batteryDialogShown = false
 
-    // Receives real-time status from ClientService
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val status = intent.getStringExtra("status") ?: return
@@ -52,7 +51,6 @@ class MainActivity : AppCompatActivity() {
                     tvTransport.text = ""
                 }
                 else -> {
-                    // Show raw status message — e.g. error details, retry info
                     tvStatus.text = status
                     tvTransport.text = ""
                 }
@@ -64,55 +62,44 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val etIp = findViewById<EditText>(R.id.etPhoneAIp)
-        val btnConnect = findViewById<Button>(R.id.btnConnect)
-        val btnSms = findViewById<Button>(R.id.btnOpenSms)
-        val btnBattery = findViewById<Button>(R.id.btnBatteryFix)
         tvStatus = findViewById(R.id.tvStatus)
         tvTransport = findViewById(R.id.tvTransport)
 
-        val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-        etIp.setText(prefs.getString("phone_a_ip", ""))
+        val tabDialer = findViewById<Button>(R.id.tabDialer)
+        val tabCallLog = findViewById<Button>(R.id.tabCallLog)
+        val tabSms = findViewById<Button>(R.id.tabSms)
+        val tabSettings = findViewById<Button>(R.id.tabSettings)
 
-        updateBatteryButton(btnBattery)
+        tabDialer.setOnClickListener { showFragment(DialerFragment()) }
+        tabCallLog.setOnClickListener { showFragment(CallLogFragment()) }
+        tabSms.setOnClickListener { startActivity(Intent(this, SmsActivity::class.java)) }
+        tabSettings.setOnClickListener { showFragment(SettingsFragment()) }
 
-        btnConnect.setOnClickListener {
-            val ip = etIp.text.toString().trim()
-            if (ip.isEmpty()) {
-                tvStatus.text = "⚠️ Enter Phone A's IP address"
-                return@setOnClickListener
-            }
-            prefs.edit().putString("phone_a_ip", ip).apply()
-            val serviceIntent = Intent(this, ClientService::class.java)
-                .putExtra("phone_a_ip", ip)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
-            tvStatus.text = "🔄 Starting..."
-            tvTransport.text = ""
-        }
-
-        btnSms.setOnClickListener {
-            startActivity(Intent(this, SmsActivity::class.java))
-        }
-
-        btnBattery.setOnClickListener {
-            if (PermissionHelper.isBatteryOptimized(this)) {
-                PermissionHelper.showBatteryDialog(this)
-            } else if (PermissionHelper.isMiui()) {
-                PermissionHelper.showHyperOsGuide(this)
-            }
+        // Default tab
+        if (savedInstanceState == null) {
+            showFragment(DialerFragment())
         }
 
         requestMissingPermissions()
     }
 
+    private fun showFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.tabContent, fragment)
+            .commit()
+    }
+
+    /** Called by CallLogFragment when user taps call-back on a log entry. */
+    fun goToDialerWithNumber(number: String) {
+        val fragment = DialerFragment()
+        showFragment(fragment)
+        // setNumber runs after the fragment view is created
+        supportFragmentManager.executePendingTransactions()
+        fragment.setNumber(number)
+    }
+
     override fun onResume() {
         super.onResume()
-        updateBatteryButton(findViewById(R.id.btnBatteryFix))
-
         val filter = IntentFilter("com.callbridge.phoneb.STATUS")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -120,7 +107,6 @@ class MainActivity : AppCompatActivity() {
             registerReceiver(statusReceiver, filter)
         }
 
-        // Reflect current state on resume
         if (TransportManager.isConnected()) {
             tvStatus.text = "✅ Connected to Phone A"
             tvTransport.text = when (TransportManager.activeTransportName()) {
@@ -141,34 +127,12 @@ class MainActivity : AppCompatActivity() {
         try { unregisterReceiver(statusReceiver) } catch (_: Exception) {}
     }
 
-    private fun updateBatteryButton(btn: Button) {
-        btn.text = when {
-            PermissionHelper.isBatteryOptimized(this) -> "⚠️ Fix Battery Optimization"
-            PermissionHelper.isMiui() -> "📱 HyperOS Setup Guide"
-            else -> "✅ Battery OK"
-        }
-    }
-
     private fun requestMissingPermissions() {
         val missing = REQUIRED_PERMISSIONS.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missing.toTypedArray(), REQUEST_PERMISSIONS)
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_PERMISSIONS) {
-            val denied = permissions.zip(grantResults.toList())
-                .filter { it.second != PackageManager.PERMISSION_GRANTED }
-                .map { it.first.substringAfterLast(".") }
-            if (denied.isNotEmpty()) {
-                tvStatus.text = "⚠️ Missing: ${denied.joinToString(", ")}"
-            }
         }
     }
 }

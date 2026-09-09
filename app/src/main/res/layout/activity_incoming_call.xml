@@ -8,6 +8,7 @@
     android:padding="32dp">
 
     <TextView
+        android:id="@+id/tvCallLabel"
         android:text="📞 INCOMING CALL"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -30,7 +31,18 @@
         android:layout_height="wrap_content"
         android:textSize="16sp"
         android:textColor="#90CAF9"
-        android:layout_marginBottom="64dp" />
+        android:layout_marginBottom="8dp" />
+
+    <!-- Live call duration timer, only visible once call is active -->
+    <TextView
+        android:id="@+id/tvTimer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="24sp"
+        android:textColor="#FFFFFF"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="48dp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"

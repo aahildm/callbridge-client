@@ -2,78 +2,79 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center">
+    android:orientation="vertical">
 
-    <TextView
-        android:text="CallBridge"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
-
-    <TextView
-        android:text="Phone B — Receiver"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="14sp"
-        android:textColor="#888888"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:id="@+id/tvStatus"
+    <!-- Connection status bar -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:gravity="center"
-        android:layout_marginBottom="4dp" />
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#F0F0F0">
 
-    <TextView
-        android:id="@+id/tvTransport"
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvTransport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:textColor="#888888" />
+    </LinearLayout>
+
+    <!-- Tab content area -->
+    <FrameLayout
+        android:id="@+id/tabContent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Bottom tab bar -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="13sp"
-        android:gravity="center"
-        android:textColor="#888888"
-        android:layout_marginBottom="20dp" />
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:elevation="8dp">
 
-    <EditText
-        android:id="@+id/etPhoneAIp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Phone A IP (e.g. 192.168.1.100)"
-        android:inputType="text"
-        android:layout_marginBottom="12dp" />
+        <Button
+            android:id="@+id/tabDialer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⌨️ Dialer"
+            android:background="?attr/selectableItemBackground" />
 
-    <Button
-        android:id="@+id/btnConnect"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Connect to Phone A"
-        android:layout_marginBottom="10dp" />
+        <Button
+            android:id="@+id/tabCallLog"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📋 Calls"
+            android:background="?attr/selectableItemBackground" />
 
-    <Button
-        android:id="@+id/btnBatteryFix"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="⚠️ Fix Battery Optimization"
-        android:layout_marginBottom="10dp" />
+        <Button
+            android:id="@+id/tabSms"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📩 SMS"
+            android:background="?attr/selectableItemBackground" />
 
-    <Button
-        android:id="@+id/btnOpenSms"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="📩 Open SMS Inbox" />
+        <Button
+            android:id="@+id/tabSettings"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚙️ Setup"
+            android:background="?attr/selectableItemBackground" />
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Enter the IP shown on Phone A's screen, then tap Connect."
-        android:textSize="13sp"
-        android:layout_marginTop="20dp"
-        android:gravity="center"
-        android:textColor="#888888" />
+    </LinearLayout>
 
 </LinearLayout>

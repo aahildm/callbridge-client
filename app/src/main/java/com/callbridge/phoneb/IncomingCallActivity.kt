@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
@@ -14,11 +16,53 @@ import androidx.appcompat.app.AppCompatActivity
 class IncomingCallActivity : AppCompatActivity() {
 
     private var callerNumber = ""
+    private var callStartTime = 0L
+    private var timerRunning = false
+    private val handler = Handler(Looper.getMainLooper())
 
-    // Receives CALL_ENDED broadcast from ClientService
+    private lateinit var tvCallStatus: TextView
+    private lateinit var tvTimer: TextView
+    private lateinit var tvCallLabel: TextView
+    private lateinit var btnAnswer: Button
+    private lateinit var btnReject: Button
+
+    // Ticks every second to update the live call duration
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            if (timerRunning) {
+                val elapsed = (System.currentTimeMillis() - callStartTime) / 1000
+                val mins = elapsed / 60
+                val secs = elapsed % 60
+                tvTimer.text = String.format("%02d:%02d", mins, secs)
+                handler.postDelayed(this, 1000)
+            }
+        }
+    }
+
+    // Handles real-time call state changes from ClientService
+    private val callStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.getStringExtra("state")) {
+                "DIALING" -> tvCallStatus.text = "Dialing..."
+                "ACTIVE" -> {
+                    tvCallStatus.text = "Connected"
+                    tvCallLabel.text = "📞 ON CALL"
+                    btnAnswer.visibility = android.view.View.GONE
+                    btnReject.text = "End Call"
+                    startTimer()
+                }
+                "ENDED" -> {
+                    stopTimer()
+                    finish()
+                }
+            }
+        }
+    }
+
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             AudioClient.stop()
+            stopTimer()
             finish()
         }
     }
@@ -26,7 +70,6 @@ class IncomingCallActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Show over lock screen and turn screen on
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -45,40 +88,58 @@ class IncomingCallActivity : AppCompatActivity() {
         callerNumber = intent.getStringExtra("caller_number") ?: "Unknown"
 
         val tvCaller = findViewById<TextView>(R.id.tvCaller)
-        val tvStatus = findViewById<TextView>(R.id.tvCallStatus)
-        val btnAnswer = findViewById<Button>(R.id.btnAnswer)
-        val btnReject = findViewById<Button>(R.id.btnReject)
+        tvCallStatus = findViewById(R.id.tvCallStatus)
+        tvTimer = findViewById(R.id.tvTimer)
+        tvCallLabel = findViewById(R.id.tvCallLabel)
+        btnAnswer = findViewById(R.id.btnAnswer)
+        btnReject = findViewById(R.id.btnReject)
 
         tvCaller.text = callerNumber
-        tvStatus.text = "Incoming call from Phone A"
+        tvCallStatus.text = "Incoming call from Phone A"
 
         btnAnswer.setOnClickListener {
             TransportManager.answer()
-            tvStatus.text = "Connected..."
+            tvCallStatus.text = "Answering..."
             btnAnswer.isEnabled = false
-            btnReject.text = "End Call"
-            btnReject.setOnClickListener {
+        }
+
+        btnReject.setOnClickListener {
+            if (btnReject.text == "End Call") {
                 TransportManager.hangup()
                 AudioClient.stop()
+                stopTimer()
+                finish()
+            } else {
+                TransportManager.reject()
                 finish()
             }
         }
 
-        btnReject.setOnClickListener {
-            TransportManager.reject()
-            finish()
-        }
-
-        // Register for CALL_ENDED broadcast
         val filter = IntentFilter("com.callbridge.phoneb.CALL_ENDED")
+        val stateFilter = IntentFilter("com.callbridge.phoneb.CALL_STATE")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(callEndedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(callStateReceiver, stateFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(callEndedReceiver, filter)
+            registerReceiver(callStateReceiver, stateFilter)
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
+    private fun startTimer() {
+        if (timerRunning) return
+        callStartTime = System.currentTimeMillis()
+        timerRunning = true
+        tvTimer.visibility = android.view.View.VISIBLE
+        handler.post(timerRunnable)
+    }
+
+    private fun stopTimer() {
+        timerRunning = false
+        handler.removeCallbacks(timerRunnable)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         if (intent?.action == "INCOMING_CALL") {
             callerNumber = intent.getStringExtra("caller_number") ?: "Unknown"
@@ -88,6 +149,8 @@ class IncomingCallActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopTimer()
         try { unregisterReceiver(callEndedReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(callStateReceiver) } catch (_: Exception) {}
     }
 }

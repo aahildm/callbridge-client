@@ -38,9 +38,10 @@ class ClientService : Service() {
     }
 
     private fun handleEvent(event: String) {
-        Log.d(TAG, "Event: $event")
+        // Skip logging full audio/calllog payloads to avoid log spam
+        if (!event.startsWith("CALLLOG|")) Log.d(TAG, "Event: $event")
+
         when {
-            // Show detailed status messages in notification
             event.startsWith("STATUS|") -> {
                 val msg = event.removePrefix("STATUS|")
                 updateNotification(msg)
@@ -50,6 +51,8 @@ class ClientService : Service() {
                 val transport = TransportManager.activeTransportName()
                 updateNotification("✅ Connected via $transport")
                 broadcastStatus("CONNECTED|$transport")
+                // Ask for call log right after connecting in case auto-send missed it
+                TransportManager.send("GET_CALLLOG")
             }
             event == "FALLBACK_BLUETOOTH" -> {
                 updateNotification("🔄 WiFi failed — trying Bluetooth...")
@@ -60,17 +63,21 @@ class ClientService : Service() {
                 broadcastStatus("DISCONNECTED")
             }
             event.startsWith("RING|") -> {
-                val number = event.removePrefix("RING|")
-                showIncomingCallScreen(number)
+                showIncomingCallScreen(event.removePrefix("RING|"))
                 vibrate()
+            }
+            event == "STATE|DIALING" -> {
+                broadcastCallState("DIALING")
+            }
+            event == "STATE|ACTIVE" -> {
+                AudioClient.start(phoneAIp)
+                broadcastCallState("ACTIVE")
             }
             event == "ENDED" -> {
                 stopVibration()
                 AudioClient.stop()
+                broadcastCallState("ENDED")
                 sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
-            }
-            event.startsWith("STATE|ACTIVE") -> {
-                AudioClient.start(phoneAIp)
             }
             event.startsWith("SMS_IN|") -> {
                 val parts = event.removePrefix("SMS_IN|").split("|", limit = 3)
@@ -85,13 +92,25 @@ class ClientService : Service() {
                     showSmsNotification(msg)
                 }
             }
+            event.startsWith("CALLLOG|") -> {
+                CallLogStore.update(event.removePrefix("CALLLOG|"))
+            }
+            event.startsWith("DIAL_FAIL|") -> {
+                broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
+            }
         }
     }
 
-    // Send status to MainActivity via broadcast so UI updates in real time
     private fun broadcastStatus(status: String) {
         sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply {
             putExtra("status", status)
+        })
+    }
+
+    /** Notifies IncomingCallActivity (or any listener) about call state for timer/UI updates. */
+    private fun broadcastCallState(state: String) {
+        sendBroadcast(Intent("com.callbridge.phoneb.CALL_STATE").apply {
+            putExtra("state", state)
         })
     }
 

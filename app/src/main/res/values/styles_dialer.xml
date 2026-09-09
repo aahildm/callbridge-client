@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="DialKey">
+        <item name="android:layout_width">80dp</item>
+        <item name="android:layout_height">60dp</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:layout_margin">4dp</item>
+    </style>
+</resources>
