@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 
 class SettingsFragment : Fragment(R.layout.fragment_settings) {
@@ -23,6 +24,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         val btnForceWifi = view.findViewById<Button>(R.id.btnForceWifi)
         val btnForceBluetooth = view.findViewById<Button>(R.id.btnForceBluetooth)
         val tvPairedDevice = view.findViewById<TextView>(R.id.tvPairedDevice)
+        val btnRestartApp = view.findViewById<Button>(R.id.btnRestartApp)
 
         val prefs = requireContext().getSharedPreferences("callbridge", Context.MODE_PRIVATE)
         etIp.setText(prefs.getString("phone_a_ip", ""))
@@ -40,7 +42,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         btnForceWifi.setOnClickListener {
             val ip = etIp.text.toString().trim()
             if (ip.isEmpty()) {
-                android.widget.Toast.makeText(requireContext(), "Enter Phone A's IP first", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Enter Phone A's IP first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             ensureServiceRunning(ip)
@@ -60,6 +62,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
                 PermissionHelper.showHyperOsGuide(act)
             }
         }
+
+        btnRestartApp.setOnClickListener {
+            Toast.makeText(requireContext(), "Restarting...", Toast.LENGTH_SHORT).show()
+            RestartHelper.restartApp(requireActivity())
+        }
     }
 
     private fun startClientService(ip: String) {
@@ -72,10 +79,6 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         }
     }
 
-    /** Makes sure ClientService (and therefore TransportManager) is alive before
-     *  forcing a transport switch — the force buttons are for testing an
-     *  already-running connection, but shouldn't silently no-op if the
-     *  service was never started. */
     private fun ensureServiceRunning(ip: String) {
         if (ip.isNotEmpty()) {
             val prefs = requireContext().getSharedPreferences("callbridge", Context.MODE_PRIVATE)

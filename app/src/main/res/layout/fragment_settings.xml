@@ -28,8 +28,6 @@
         android:text="Connect to Phone A"
         android:layout_marginBottom="10dp" />
 
-    <!-- Manual transport controls — lets you actually see and test
-         which connection type is active instead of it being invisible -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -66,6 +64,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="⚠️ Fix Battery Optimization"
+        android:layout_marginBottom="10dp" />
+
+    <!-- Force restart — clears any stale connection state after updates -->
+    <Button
+        android:id="@+id/btnRestartApp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔄 Force Restart App"
+        android:backgroundTint="#FF7043"
+        android:textColor="#FFFFFF"
         android:layout_marginBottom="10dp" />
 
     <TextView
