@@ -30,6 +30,7 @@ object TransportManager {
     fun connect(ip: String) {
         cancelFallback()
         active = Active.NONE
+        SocketClient.resume()
         BluetoothClient.disconnect()
 
         Log.d(TAG, "Trying WiFi to $ip first")
@@ -47,25 +48,33 @@ object TransportManager {
         handler.postDelayed(fallbackRunnable!!, WIFI_TIMEOUT_MS)
     }
 
-    /** Manually forces WiFi, bypassing the normal auto-fallback flow — for testing. */
+    /** Manually forces WiFi, cancelling any Bluetooth attempt and re-enabling
+     *  WiFi's reconnect logic (which forceBluetooth had suspended). */
     fun forceWifi(ip: String) {
         cancelFallback()
         BluetoothClient.disconnect()
         active = Active.NONE
+        SocketClient.resume()
         Log.d(TAG, "Forcing WiFi transport to $ip")
         onEvent?.invoke("STATUS|Forcing WiFi...")
         SocketClient.connect(ip)
     }
 
-    /** Manually forces Bluetooth, bypassing WiFi entirely — for testing. */
+    /** Manually forces Bluetooth. Suspends WiFi entirely first — this is the
+     *  key fix: without suspend(), a WiFi reconnect timer scheduled before
+     *  this call could still fire later and silently pull the connection
+     *  back to WiFi, overwriting the Bluetooth status. */
     fun forceBluetooth() {
         cancelFallback()
-        SocketClient.disconnect()
+        SocketClient.suspend()
         active = Active.NONE
         Log.d(TAG, "Forcing Bluetooth transport")
         onEvent?.invoke("STATUS|Forcing Bluetooth...")
         val ok = BluetoothClient.connect()
-        if (!ok) onEvent?.invoke("STATUS|Bluetooth connect failed — check pairing")
+        if (!ok) {
+            // connect() already emitted a specific STATUS reason via onEvent
+            onEvent?.invoke("DISCONNECTED")
+        }
     }
 
     private fun onTransportEvent(from: Active, event: String) {
