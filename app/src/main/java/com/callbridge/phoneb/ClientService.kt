@@ -61,20 +61,30 @@ class ClientService : Service() {
                 broadcastStatus("DISCONNECTED")
             }
             event.startsWith("RING|") -> {
-                showIncomingCallNotification(event.removePrefix("RING|"))
+                val number = event.removePrefix("RING|")
+                CallStateStore.setCall(number, outgoing = false)
+                CallStateStore.update("RINGING")
+                showIncomingCallNotification(number)
             }
-            event == "STATE|DIALING" -> broadcastCallState("DIALING")
+            event == "STATE|DIALING" -> {
+                CallStateStore.update("DIALING")
+            }
             event == "STATE|ACTIVE" -> {
                 AudioClient.start(phoneAIp)
-                broadcastCallState("ACTIVE")
+                CallStateStore.update("ACTIVE")
                 getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
             }
-            event == "STATE|HOLDING" -> broadcastCallState("HOLDING")
+            event == "STATE|HOLDING" -> {
+                CallStateStore.update("HOLDING")
+            }
             event == "ENDED" -> {
                 AudioClient.stop()
-                broadcastCallState("ENDED")
+                CallStateStore.update("ENDED")
                 sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
                 getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
+                // Reset shortly after so a fresh call starts clean
+                android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed({ CallStateStore.reset() }, 1000)
             }
             event.startsWith("SMS_IN|") -> {
                 val parts = event.removePrefix("SMS_IN|").split("|", limit = 3)
@@ -104,18 +114,6 @@ class ClientService : Service() {
         })
     }
 
-    private fun broadcastCallState(state: String) {
-        sendBroadcast(Intent("com.callbridge.phoneb.CALL_STATE").apply {
-            putExtra("state", state)
-        })
-    }
-
-    /**
-     * Shows a full-screen call notification so the incoming call pops up
-     * over the lock screen and other apps, the way a real phone call does,
-     * instead of relying on startActivity from a background service (which
-     * Android restricts on API 29+).
-     */
     private fun showIncomingCallNotification(number: String) {
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
             putExtra("caller_number", number)
@@ -154,8 +152,6 @@ class ClientService : Service() {
         }
 
         getSystemService(NotificationManager::class.java)?.notify(CALL_NOTIF_ID, notif)
-        // Also launch directly in case the app is already foregrounded —
-        // full-screen intent alone sometimes doesn't fire if we're already visible.
         try {
             startActivity(fullScreenIntent)
         } catch (_: Exception) {}
@@ -205,7 +201,6 @@ class ClientService : Service() {
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
-
             nm?.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID, "CallBridge", NotificationManager.IMPORTANCE_LOW
@@ -214,15 +209,13 @@ class ClientService : Service() {
                     setShowBadge(false)
                 }
             )
-
-            // Separate high-importance channel so incoming calls always break through
             nm?.createNotificationChannel(
                 NotificationChannel(
                     CALL_CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH
                 ).apply {
                     description = "CallBridge incoming call alerts"
                     setShowBadge(true)
-                    setSound(null, null) // ringtone is played manually by RingtoneHelper
+                    setSound(null, null)
                 }
             )
         }

@@ -45,36 +45,16 @@ class IncomingCallActivity : AppCompatActivity() {
         }
     }
 
+    // Handles any state change that happens WHILE this screen is open
     private val callStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            when (intent.getStringExtra("state")) {
-                "DIALING" -> tvCallStatus.text = "Dialing..."
-                "ACTIVE" -> {
-                    RingtoneHelper.stopRinging()
-                    tvCallStatus.text = "Connected"
-                    tvCallLabel.text = "📞 ON CALL"
-                    btnAnswer.visibility = View.GONE
-                    btnReject.text = "End Call"
-                    rowInCallControls.visibility = View.VISIBLE
-                    startTimer()
-                }
-                "HOLDING" -> tvCallStatus.text = "On hold"
-                "ENDED" -> {
-                    RingtoneHelper.stopRinging()
-                    stopTimer()
-                    finish()
-                }
-            }
+            applyState(intent.getStringExtra("state") ?: return)
         }
     }
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            RingtoneHelper.stopRinging()
-            AudioClient.stop()
-            CallAudioController.reset()
-            stopTimer()
-            finish()
+            applyState("ENDED")
         }
     }
 
@@ -121,7 +101,6 @@ class IncomingCallActivity : AppCompatActivity() {
             btnReject.text = "Cancel"
         } else {
             tvCallStatus.text = "Incoming call from Phone A"
-            // Ring and vibrate for incoming calls only — not for calls we're placing
             RingtoneHelper.startRinging(this)
         }
 
@@ -179,6 +158,37 @@ class IncomingCallActivity : AppCompatActivity() {
             registerReceiver(callEndedReceiver, filter)
             registerReceiver(callStateReceiver, stateFilter)
         }
+
+        // KEY FIX: read whatever state already happened before this screen
+        // finished registering its receiver — closes the race where
+        // STATE|ACTIVE arrives between startActivity() and onCreate() completing.
+        CallStateStore.onStateChanged = { state ->
+            runOnUiThread { applyState(state) }
+        }
+        applyState(CallStateStore.currentState)
+    }
+
+    /** Single place that updates the UI for any given call state — used both
+     *  for the initial state read and for every subsequent broadcast/callback. */
+    private fun applyState(state: String) {
+        when (state) {
+            "DIALING" -> tvCallStatus.text = "Dialing..."
+            "ACTIVE" -> {
+                RingtoneHelper.stopRinging()
+                tvCallStatus.text = "Connected"
+                tvCallLabel.text = "📞 ON CALL"
+                btnAnswer.visibility = View.GONE
+                btnReject.text = "End Call"
+                rowInCallControls.visibility = View.VISIBLE
+                startTimer()
+            }
+            "HOLDING" -> tvCallStatus.text = "On hold"
+            "ENDED" -> {
+                RingtoneHelper.stopRinging()
+                stopTimer()
+                finish()
+            }
+        }
     }
 
     private fun startTimer() {
@@ -208,6 +218,7 @@ class IncomingCallActivity : AppCompatActivity() {
         RingtoneHelper.stopRinging()
         stopTimer()
         CallAudioController.reset()
+        CallStateStore.onStateChanged = null
         try { unregisterReceiver(callEndedReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(callStateReceiver) } catch (_: Exception) {}
     }

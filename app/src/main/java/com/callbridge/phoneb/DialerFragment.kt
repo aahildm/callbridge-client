@@ -20,7 +20,6 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
         val tvDialStatus = view.findViewById<TextView>(R.id.tvDialStatus)
         val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
 
-        // Each key is a LinearLayout with its digit/symbol in the "tag" attribute
         for (i in 0 until gridKeys.childCount) {
             val child = gridKeys.getChildAt(i)
             val key = child.tag as? String
@@ -44,6 +43,12 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
                 tvDialStatus.text = "⚠️ Not connected to Phone A"
                 return@setOnClickListener
             }
+            // Set state BEFORE launching the activity so it's already
+            // correct by the time onCreate reads it — no race with the
+            // STATE|DIALING broadcast that follows shortly after.
+            CallStateStore.setCall(number, outgoing = true)
+            CallStateStore.update("DIALING")
+
             TransportManager.send("DIAL|$number")
             val intent = Intent(requireContext(), IncomingCallActivity::class.java).apply {
                 putExtra("caller_number", number)
