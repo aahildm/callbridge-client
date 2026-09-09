@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="20dp"
     android:gravity="center">
 
     <EditText
@@ -12,9 +12,11 @@
         android:layout_height="wrap_content"
         android:hint="Enter number"
         android:inputType="phone"
-        android:textSize="28sp"
+        android:textSize="26sp"
+        android:letterSpacing="0.05"
         android:gravity="center"
-        android:layout_marginBottom="24dp" />
+        android:background="@null"
+        android:layout_marginBottom="20dp" />
 
     <GridLayout
         android:id="@+id/gridKeys"
@@ -22,20 +24,21 @@
         android:layout_height="wrap_content"
         android:columnCount="3"
         android:rowCount="4"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="20dp"
+        android:useDefaultMargins="false">
 
-        <Button android:text="1" style="@style/DialKey" />
-        <Button android:text="2" style="@style/DialKey" />
-        <Button android:text="3" style="@style/DialKey" />
-        <Button android:text="4" style="@style/DialKey" />
-        <Button android:text="5" style="@style/DialKey" />
-        <Button android:text="6" style="@style/DialKey" />
-        <Button android:text="7" style="@style/DialKey" />
-        <Button android:text="8" style="@style/DialKey" />
-        <Button android:text="9" style="@style/DialKey" />
-        <Button android:text="*" style="@style/DialKey" />
-        <Button android:text="0" style="@style/DialKey" />
-        <Button android:text="#" style="@style/DialKey" />
+        <LinearLayout android:tag="1" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="1"/><TextView style="@style/DialKeySub" android:text=" "/></LinearLayout>
+        <LinearLayout android:tag="2" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="2"/><TextView style="@style/DialKeySub" android:text="ABC"/></LinearLayout>
+        <LinearLayout android:tag="3" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="3"/><TextView style="@style/DialKeySub" android:text="DEF"/></LinearLayout>
+        <LinearLayout android:tag="4" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="4"/><TextView style="@style/DialKeySub" android:text="GHI"/></LinearLayout>
+        <LinearLayout android:tag="5" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="5"/><TextView style="@style/DialKeySub" android:text="JKL"/></LinearLayout>
+        <LinearLayout android:tag="6" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="6"/><TextView style="@style/DialKeySub" android:text="MNO"/></LinearLayout>
+        <LinearLayout android:tag="7" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="7"/><TextView style="@style/DialKeySub" android:text="PQRS"/></LinearLayout>
+        <LinearLayout android:tag="8" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="8"/><TextView style="@style/DialKeySub" android:text="TUV"/></LinearLayout>
+        <LinearLayout android:tag="9" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="9"/><TextView style="@style/DialKeySub" android:text="WXYZ"/></LinearLayout>
+        <LinearLayout android:tag="*" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="*"/><TextView style="@style/DialKeySub" android:text=" "/></LinearLayout>
+        <LinearLayout android:tag="0" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="0"/><TextView style="@style/DialKeySub" android:text="+"/></LinearLayout>
+        <LinearLayout android:tag="#" style="@style/DialKey"><TextView style="@style/DialKeyNum" android:text="#"/><TextView style="@style/DialKeySub" android:text=" "/></LinearLayout>
 
     </GridLayout>
 
@@ -43,24 +46,31 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center">
+        android:gravity="center"
+        android:layout_marginTop="4dp">
 
-        <Button
+        <ImageButton
             android:id="@+id/btnBackspace"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:text="⌫"
-            android:textSize="20sp"
-            android:layout_marginEnd="24dp" />
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_input_delete"
+            android:background="@null"
+            android:layout_marginEnd="32dp"
+            android:contentDescription="Backspace" />
 
         <Button
             android:id="@+id/btnCall"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:text="📞"
-            android:textSize="24sp"
+            android:textSize="26sp"
             android:backgroundTint="#4CAF50"
             android:textColor="#FFFFFF" />
+
+        <View
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="32dp" />
 
     </LinearLayout>
 
@@ -71,6 +81,6 @@
         android:textSize="13sp"
         android:gravity="center"
         android:textColor="#888888"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="12dp" />
 
 </LinearLayout>

@@ -16,14 +16,16 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
 
         val etNumber = view.findViewById<EditText>(R.id.etDialNumber)
         val btnCall = view.findViewById<Button>(R.id.btnCall)
-        val btnBackspace = view.findViewById<Button>(R.id.btnBackspace)
+        val btnBackspace = view.findViewById<View>(R.id.btnBackspace)
         val tvDialStatus = view.findViewById<TextView>(R.id.tvDialStatus)
         val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
 
+        // Each key is a LinearLayout with its digit/symbol in the "tag" attribute
         for (i in 0 until gridKeys.childCount) {
             val child = gridKeys.getChildAt(i)
-            if (child is Button) {
-                child.setOnClickListener { etNumber.append(child.text) }
+            val key = child.tag as? String
+            if (key != null) {
+                child.setOnClickListener { etNumber.append(key) }
             }
         }
 
@@ -43,7 +45,6 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
                 return@setOnClickListener
             }
             TransportManager.send("DIAL|$number")
-            // Launch full-screen call UI with mute/speaker/cancel, same as incoming calls
             val intent = Intent(requireContext(), IncomingCallActivity::class.java).apply {
                 putExtra("caller_number", number)
                 putExtra("outgoing", true)

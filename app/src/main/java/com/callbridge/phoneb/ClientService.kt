@@ -9,21 +9,21 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Log
 
 class ClientService : Service() {
 
     private val TAG = "CallBridge-ClientSvc"
     private val CHANNEL_ID = "callbridge_client"
+    private val CALL_CHANNEL_ID = "callbridge_incoming_call"
     private val NOTIF_ID = 2
+    private val CALL_NOTIF_ID = 3
 
     private var phoneAIp = ""
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannels()
         startForeground(NOTIF_ID, buildNotification("Starting..."))
 
         val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
@@ -61,20 +61,20 @@ class ClientService : Service() {
                 broadcastStatus("DISCONNECTED")
             }
             event.startsWith("RING|") -> {
-                showIncomingCallScreen(event.removePrefix("RING|"))
-                vibrate()
+                showIncomingCallNotification(event.removePrefix("RING|"))
             }
             event == "STATE|DIALING" -> broadcastCallState("DIALING")
             event == "STATE|ACTIVE" -> {
                 AudioClient.start(phoneAIp)
                 broadcastCallState("ACTIVE")
+                getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
             }
             event == "STATE|HOLDING" -> broadcastCallState("HOLDING")
             event == "ENDED" -> {
-                stopVibration()
                 AudioClient.stop()
                 broadcastCallState("ENDED")
                 sendBroadcast(Intent("com.callbridge.phoneb.CALL_ENDED"))
+                getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
             }
             event.startsWith("SMS_IN|") -> {
                 val parts = event.removePrefix("SMS_IN|").split("|", limit = 3)
@@ -110,13 +110,55 @@ class ClientService : Service() {
         })
     }
 
-    private fun showIncomingCallScreen(number: String) {
-        val intent = Intent(this, IncomingCallActivity::class.java).apply {
+    /**
+     * Shows a full-screen call notification so the incoming call pops up
+     * over the lock screen and other apps, the way a real phone call does,
+     * instead of relying on startActivity from a background service (which
+     * Android restricts on API 29+).
+     */
+    private fun showIncomingCallNotification(number: String) {
+        val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
             putExtra("caller_number", number)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             action = "INCOMING_CALL"
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_NO_USER_ACTION or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        startActivity(intent)
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this, 0, fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CALL_CHANNEL_ID)
+                .setContentTitle("Incoming call")
+                .setContentText(number)
+                .setSmallIcon(android.R.drawable.ic_menu_call)
+                .setPriority(Notification.PRIORITY_MAX)
+                .setCategory(Notification.CATEGORY_CALL)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setContentIntent(fullScreenPendingIntent)
+                .setOngoing(true)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+                .setContentTitle("Incoming call")
+                .setContentText(number)
+                .setSmallIcon(android.R.drawable.ic_menu_call)
+                .setPriority(Notification.PRIORITY_MAX)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setContentIntent(fullScreenPendingIntent)
+                .setOngoing(true)
+                .build()
+        }
+
+        getSystemService(NotificationManager::class.java)?.notify(CALL_NOTIF_ID, notif)
+        // Also launch directly in case the app is already foregrounded —
+        // full-screen intent alone sometimes doesn't fire if we're already visible.
+        try {
+            startActivity(fullScreenIntent)
+        } catch (_: Exception) {}
     }
 
     private fun showSmsNotification(msg: SmsStore.Message) {
@@ -125,7 +167,7 @@ class ClientService : Service() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notif = buildNotifBuilder()
+        val notif = buildNotifBuilder(CHANNEL_ID)
             .setContentTitle("SMS from ${msg.sender}")
             .setContentText(msg.body)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
@@ -134,26 +176,6 @@ class ClientService : Service() {
             .build()
         getSystemService(NotificationManager::class.java)
             ?.notify(msg.sender.hashCode(), notif)
-    }
-
-    private fun vibrate() {
-        val pattern = longArrayOf(0, 500, 500, 500, 500, 500)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getSystemService(VibratorManager::class.java)?.defaultVibrator
-                ?.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0))
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Vibrator::class.java)?.vibrate(pattern, 0)
-        }
-    }
-
-    private fun stopVibration() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getSystemService(VibratorManager::class.java)?.defaultVibrator?.cancel()
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Vibrator::class.java)?.cancel()
-        }
     }
 
     private fun updateNotification(text: String) {
@@ -180,22 +202,35 @@ class ClientService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "CallBridge", NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "CallBridge connection status"
-                setShowBadge(false)
-            }
-            getSystemService(NotificationManager::class.java)
-                ?.createNotificationChannel(channel)
+            val nm = getSystemService(NotificationManager::class.java)
+
+            nm?.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID, "CallBridge", NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "CallBridge connection status"
+                    setShowBadge(false)
+                }
+            )
+
+            // Separate high-importance channel so incoming calls always break through
+            nm?.createNotificationChannel(
+                NotificationChannel(
+                    CALL_CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "CallBridge incoming call alerts"
+                    setShowBadge(true)
+                    setSound(null, null) // ringtone is played manually by RingtoneHelper
+                }
+            )
         }
     }
 
-    private fun buildNotifBuilder(): Notification.Builder {
+    private fun buildNotifBuilder(channelId: String = CHANNEL_ID): Notification.Builder {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CHANNEL_ID)
+            Notification.Builder(this, channelId)
                 .setSmallIcon(android.R.drawable.ic_menu_call)
                 .setOngoing(true)
         } else {

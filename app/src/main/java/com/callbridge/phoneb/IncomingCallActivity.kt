@@ -50,6 +50,7 @@ class IncomingCallActivity : AppCompatActivity() {
             when (intent.getStringExtra("state")) {
                 "DIALING" -> tvCallStatus.text = "Dialing..."
                 "ACTIVE" -> {
+                    RingtoneHelper.stopRinging()
                     tvCallStatus.text = "Connected"
                     tvCallLabel.text = "📞 ON CALL"
                     btnAnswer.visibility = View.GONE
@@ -57,10 +58,9 @@ class IncomingCallActivity : AppCompatActivity() {
                     rowInCallControls.visibility = View.VISIBLE
                     startTimer()
                 }
-                "HOLDING" -> {
-                    tvCallStatus.text = "On hold"
-                }
+                "HOLDING" -> tvCallStatus.text = "On hold"
                 "ENDED" -> {
+                    RingtoneHelper.stopRinging()
                     stopTimer()
                     finish()
                 }
@@ -70,6 +70,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            RingtoneHelper.stopRinging()
             AudioClient.stop()
             CallAudioController.reset()
             stopTimer()
@@ -120,15 +121,19 @@ class IncomingCallActivity : AppCompatActivity() {
             btnReject.text = "Cancel"
         } else {
             tvCallStatus.text = "Incoming call from Phone A"
+            // Ring and vibrate for incoming calls only — not for calls we're placing
+            RingtoneHelper.startRinging(this)
         }
 
         btnAnswer.setOnClickListener {
+            RingtoneHelper.stopRinging()
             TransportManager.answer()
             tvCallStatus.text = "Answering..."
             btnAnswer.isEnabled = false
         }
 
         btnReject.setOnClickListener {
+            RingtoneHelper.stopRinging()
             when (btnReject.text) {
                 "End Call" -> {
                     TransportManager.hangup()
@@ -194,11 +199,13 @@ class IncomingCallActivity : AppCompatActivity() {
         if (intent?.action == "INCOMING_CALL") {
             callerNumber = intent.getStringExtra("caller_number") ?: "Unknown"
             findViewById<TextView>(R.id.tvCaller)?.text = callerNumber
+            RingtoneHelper.startRinging(this)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        RingtoneHelper.stopRinging()
         stopTimer()
         CallAudioController.reset()
         try { unregisterReceiver(callEndedReceiver) } catch (_: Exception) {}
