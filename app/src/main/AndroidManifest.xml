@@ -43,6 +43,13 @@
             android:name=".SmsActivity"
             android:exported="false" />
 
+<activity
+            android:name=".SmsThreadActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SmsNewActivity"
+            android:exported="false" />
         <service
             android:name=".ClientService"
             android:foregroundServiceType="microphone"

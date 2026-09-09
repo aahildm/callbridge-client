@@ -13,36 +13,43 @@
         android:gravity="center_vertical">
 
         <TextView
-            android:text="Conversations"
+            android:id="@+id/tvThreadTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnNewSms"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="✎ New"
-            android:backgroundTint="#FFFFFF"
-            android:textColor="#3F51B5" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvConversations"
+        android:id="@+id/rvThread"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:padding="8dp" />
 
-    <TextView
-        android:id="@+id/tvEmptySms"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No messages yet.\nTap ✎ New to start one."
-        android:gravity="center"
-        android:padding="32dp"
-        android:textColor="#888888" />
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etThreadBody"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type a message"
+            android:maxLines="4" />
+
+        <Button
+            android:id="@+id/btnThreadSend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Send" />
+
+    </LinearLayout>
 
 </LinearLayout>

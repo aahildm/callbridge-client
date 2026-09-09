@@ -20,8 +20,6 @@ class IncomingCallActivity : AppCompatActivity() {
     private var callStartTime = 0L
     private var timerRunning = false
     private var isOutgoing = false
-    private var muted = false
-    private var speakerOn = false
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var tvCallStatus: TextView
@@ -68,29 +66,16 @@ class IncomingCallActivity : AppCompatActivity() {
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             AudioClient.stop()
+            CallAudioController.reset()
             stopTimer()
             finish()
         }
     }
 
-    // Reflects mute/speaker state confirmed back by Phone A
-    private val audioStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                "com.callbridge.phoneb.MUTE_STATE" -> {
-                    muted = intent.getBooleanExtra("muted", false)
-                    btnMute.text = if (muted) "🎤 Unmute" else "🎤 Mute"
-                }
-                "com.callbridge.phoneb.SPEAKER_STATE" -> {
-                    speakerOn = intent.getBooleanExtra("on", false)
-                    btnSpeaker.text = if (speakerOn) "🔊 Speaker On" else "🔊 Speaker"
-                }
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        CallAudioController.init(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -142,12 +127,15 @@ class IncomingCallActivity : AppCompatActivity() {
                 "End Call" -> {
                     TransportManager.hangup()
                     AudioClient.stop()
+                    CallAudioController.reset()
                     stopTimer()
                     finish()
                 }
                 "Cancel" -> {
                     TransportManager.send("CANCEL_DIAL")
-                    finish()
+                    // Give the server a moment, then close regardless —
+                    // ClientService will also close this via ENDED if it arrives first
+                    handler.postDelayed({ finish() }, 300)
                 }
                 else -> {
                     TransportManager.reject()
@@ -156,28 +144,26 @@ class IncomingCallActivity : AppCompatActivity() {
             }
         }
 
+        // Local mute/speaker control — affects Phone B's own mic and speaker,
+        // not Phone A's hardware.
         btnMute.setOnClickListener {
-            TransportManager.send(if (muted) "UNMUTE" else "MUTE")
+            val nowMuted = CallAudioController.toggleMute()
+            btnMute.text = if (nowMuted) "🎤 Unmute" else "🎤 Mute"
         }
 
         btnSpeaker.setOnClickListener {
-            TransportManager.send(if (speakerOn) "SPEAKER_OFF" else "SPEAKER_ON")
+            val nowOn = CallAudioController.toggleSpeaker()
+            btnSpeaker.text = if (nowOn) "🔊 Speaker On" else "🔊 Speaker"
         }
 
         val filter = IntentFilter("com.callbridge.phoneb.CALL_ENDED")
         val stateFilter = IntentFilter("com.callbridge.phoneb.CALL_STATE")
-        val muteFilter = IntentFilter("com.callbridge.phoneb.MUTE_STATE")
-        val speakerFilter = IntentFilter("com.callbridge.phoneb.SPEAKER_STATE")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(callEndedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             registerReceiver(callStateReceiver, stateFilter, Context.RECEIVER_NOT_EXPORTED)
-            registerReceiver(audioStateReceiver, muteFilter, Context.RECEIVER_NOT_EXPORTED)
-            registerReceiver(audioStateReceiver, speakerFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(callEndedReceiver, filter)
             registerReceiver(callStateReceiver, stateFilter)
-            registerReceiver(audioStateReceiver, muteFilter)
-            registerReceiver(audioStateReceiver, speakerFilter)
         }
     }
 
@@ -205,8 +191,8 @@ class IncomingCallActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopTimer()
+        CallAudioController.reset()
         try { unregisterReceiver(callEndedReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(callStateReceiver) } catch (_: Exception) {}
-        try { unregisterReceiver(audioStateReceiver) } catch (_: Exception) {}
     }
 }

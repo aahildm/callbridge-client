@@ -1,48 +1,62 @@
 package com.callbridge.phoneb
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+/** Shows one row per contact with their latest message — the conversation list. */
 class SmsActivity : AppCompatActivity() {
+
+    private lateinit var adapter: ConversationAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sms)
 
-        val recycler = findViewById<RecyclerView>(R.id.recyclerSms)
-        val etTo = findViewById<EditText>(R.id.etTo)
-        val etBody = findViewById<EditText>(R.id.etBody)
-        val btnSend = findViewById<Button>(R.id.btnSend)
+        val rv = findViewById<RecyclerView>(R.id.rvConversations)
+        val tvEmpty = findViewById<TextView>(R.id.tvEmptySms)
+        val btnNew = findViewById<Button>(R.id.btnNewSms)
 
-        val adapter = SmsAdapter(SmsStore.getAll().toMutableList())
-        recycler.layoutManager = LinearLayoutManager(this)
-        recycler.adapter = adapter
+        adapter = ConversationAdapter(SmsStore.getConversations()) { number ->
+            startActivity(Intent(this, SmsThreadActivity::class.java).putExtra("number", number))
+        }
+        rv.layoutManager = LinearLayoutManager(this)
+        rv.adapter = adapter
 
-        SmsStore.onNewMessage = { msg ->
+        updateEmptyState(tvEmpty, rv)
+
+        SmsStore.onNewMessage = {
             runOnUiThread {
-                adapter.addMessage(msg)
-                recycler.scrollToPosition(0)
+                adapter.update(SmsStore.getConversations())
+                updateEmptyState(tvEmpty, rv)
             }
         }
 
-        btnSend.setOnClickListener {
-            val number = etTo.text.toString().trim()
-            val body = etBody.text.toString().trim()
-            if (number.isNotEmpty() && body.isNotEmpty()) {
-                TransportManager.sendSms(number, body)
-                SmsStore.add(SmsStore.Message(number, body, System.currentTimeMillis(), false))
-                adapter.addMessage(SmsStore.Message(number, body, System.currentTimeMillis(), false))
-                etBody.setText("")
-            }
+        btnNew.setOnClickListener {
+            startActivity(Intent(this, SmsNewActivity::class.java))
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        adapter.update(SmsStore.getConversations())
+        updateEmptyState(findViewById(R.id.tvEmptySms), findViewById(R.id.rvConversations))
+    }
+
+    private fun updateEmptyState(tvEmpty: TextView, rv: RecyclerView) {
+        val hasData = SmsStore.getConversations().isNotEmpty()
+        tvEmpty.visibility = if (hasData) View.GONE else View.VISIBLE
+        rv.visibility = if (hasData) View.VISIBLE else View.GONE
     }
 
     override fun onDestroy() {
@@ -51,36 +65,38 @@ class SmsActivity : AppCompatActivity() {
     }
 }
 
-class SmsAdapter(private val messages: MutableList<SmsStore.Message>) :
-    RecyclerView.Adapter<SmsAdapter.ViewHolder>() {
+class ConversationAdapter(
+    private var conversations: List<SmsStore.Message>,
+    private val onClick: (String) -> Unit
+) : RecyclerView.Adapter<ConversationAdapter.ViewHolder>() {
+
+    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val tvSender: TextView = view.findViewById(R.id.tvSender)
-        val tvBody: TextView = view.findViewById(R.id.tvBody)
-        val tvTime: TextView = view.findViewById(R.id.tvTime)
+        val tvNumber: TextView = view.findViewById(R.id.tvConvoNumber)
+        val tvPreview: TextView = view.findViewById(R.id.tvConvoPreview)
+        val tvTime: TextView = view.findViewById(R.id.tvConvoTime)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, position: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_sms, parent, false)
+            .inflate(R.layout.item_conversation, parent, false)
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val msg = messages[position]
-        holder.tvSender.text = if (msg.incoming) "From: ${msg.sender}" else "To: ${msg.sender}"
-        holder.tvBody.text = msg.body
-        holder.tvTime.text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-            .format(java.util.Date(msg.timestamp))
-        holder.itemView.setBackgroundColor(
-            if (msg.incoming) 0xFFE3F2FD.toInt() else 0xFFE8F5E9.toInt()
-        )
+        val msg = conversations[position]
+        holder.tvNumber.text = msg.sender
+        val prefix = if (msg.incoming) "" else "You: "
+        holder.tvPreview.text = "$prefix${msg.body}"
+        holder.tvTime.text = timeFormat.format(Date(msg.timestamp))
+        holder.itemView.setOnClickListener { onClick(msg.sender) }
     }
 
-    override fun getItemCount() = messages.size
+    override fun getItemCount() = conversations.size
 
-    fun addMessage(msg: SmsStore.Message) {
-        messages.add(0, msg)
-        notifyItemInserted(0)
+    fun update(newList: List<SmsStore.Message>) {
+        conversations = newList
+        notifyDataSetChanged()
     }
 }

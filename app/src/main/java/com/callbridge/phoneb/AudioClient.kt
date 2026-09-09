@@ -23,11 +23,15 @@ object AudioClient {
     private const val SEND_PORT = 9002
 
     @Volatile private var running = false
+    @Volatile private var muted = false
     private var sendThread: Thread? = null
     private var receiveThread: Thread? = null
     private var btPlayer: AudioTrack? = null
 
-    // Called by BluetoothClient when AUDIO| chunk arrives
+    fun setMuted(mute: Boolean) {
+        muted = mute
+    }
+
     fun onBluetoothAudio(base64Chunk: String) {
         if (!running) return
         try {
@@ -41,7 +45,6 @@ object AudioClient {
     fun start(phoneAIp: String) {
         if (running) return
         running = true
-        // Use public method instead of accessing private field
         if (TransportManager.isBluetoothActive()) {
             startBluetooth()
         } else {
@@ -77,7 +80,7 @@ object AudioClient {
                 val buffer = ByteArray(bufferSize)
                 while (running) {
                     val read = recorder.read(buffer, 0, bufferSize)
-                    if (read > 0) {
+                    if (read > 0 && !muted) {
                         val chunk = Base64.encodeToString(buffer.copyOf(read), Base64.NO_WRAP)
                         BluetoothClient.send("AUDIO|$chunk")
                     }
@@ -137,7 +140,7 @@ object AudioClient {
                 val buffer = ByteArray(bufferSize)
                 while (running) {
                     val read = recorder.read(buffer, 0, bufferSize)
-                    if (read > 0) {
+                    if (read > 0 && !muted) {
                         val packet = DatagramPacket(buffer, read, address, SEND_PORT)
                         socket.send(packet)
                     }
@@ -153,6 +156,7 @@ object AudioClient {
 
     fun stop() {
         running = false
+        muted = false
         btPlayer?.stop()
         btPlayer?.release()
         btPlayer = null

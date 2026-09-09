@@ -12,16 +12,21 @@ object SmsStore {
     var onNewMessage: ((Message) -> Unit)? = null
 
     fun add(msg: Message) {
-        messages.add(0, msg) // newest first
-        if (messages.size > 200) messages.removeAt(messages.size - 1) // cap at 200
+        messages.add(0, msg)
+        if (messages.size > 500) messages.removeAt(messages.size - 1)
         onNewMessage?.invoke(msg)
     }
 
     fun getAll(): List<Message> = messages.toList()
 
+    /** All messages to/from a specific number, oldest first for thread display. */
     fun getThread(contact: String): List<Message> =
-        messages.filter { it.sender == contact || (!it.incoming && it.sender == contact) }
+        messages.filter { it.sender == contact }.sortedBy { it.timestamp }
 
-    fun getContacts(): List<String> =
-        messages.map { it.sender }.distinct()
+    /** One entry per contact, with their most recent message, newest conversation first. */
+    fun getConversations(): List<Message> =
+        messages
+            .groupBy { it.sender }
+            .map { (_, msgs) -> msgs.maxByOrNull { it.timestamp }!! }
+            .sortedByDescending { it.timestamp }
 }
