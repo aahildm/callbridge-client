@@ -12,7 +12,6 @@ object TransportManager {
 
     enum class Active { NONE, WIFI, BLUETOOTH }
 
-    // Internal state — exposed via activeTransport for AudioClient
     internal var active = Active.NONE
         private set
 
@@ -46,6 +45,27 @@ object TransportManager {
             }
         }
         handler.postDelayed(fallbackRunnable!!, WIFI_TIMEOUT_MS)
+    }
+
+    /** Manually forces WiFi, bypassing the normal auto-fallback flow — for testing. */
+    fun forceWifi(ip: String) {
+        cancelFallback()
+        BluetoothClient.disconnect()
+        active = Active.NONE
+        Log.d(TAG, "Forcing WiFi transport to $ip")
+        onEvent?.invoke("STATUS|Forcing WiFi...")
+        SocketClient.connect(ip)
+    }
+
+    /** Manually forces Bluetooth, bypassing WiFi entirely — for testing. */
+    fun forceBluetooth() {
+        cancelFallback()
+        SocketClient.disconnect()
+        active = Active.NONE
+        Log.d(TAG, "Forcing Bluetooth transport")
+        onEvent?.invoke("STATUS|Forcing Bluetooth...")
+        val ok = BluetoothClient.connect()
+        if (!ok) onEvent?.invoke("STATUS|Bluetooth connect failed — check pairing")
     }
 
     private fun onTransportEvent(from: Active, event: String) {
@@ -86,7 +106,6 @@ object TransportManager {
         Active.NONE -> "None"
     }
 
-    // Expose for AudioClient to check transport type
     fun isBluetoothActive() = active == Active.BLUETOOTH
 
     fun disconnect() {

@@ -28,6 +28,39 @@
         android:text="Connect to Phone A"
         android:layout_marginBottom="10dp" />
 
+    <!-- Manual transport controls — lets you actually see and test
+         which connection type is active instead of it being invisible -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/btnForceWifi"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📶 Use WiFi"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/btnForceBluetooth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🔵 Use Bluetooth" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvPairedDevice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:layout_marginBottom="10dp" />
+
     <Button
         android:id="@+id/btnBatteryFix"
         android:layout_width="match_parent"
@@ -38,7 +71,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Enter the IP shown on Phone A's screen, then tap Connect."
+        android:text="Enter the IP shown on Phone A's screen, then tap Connect. Use the WiFi/Bluetooth buttons to force a specific transport for testing."
         android:textSize="13sp"
         android:layout_marginTop="16dp"
         android:gravity="center"
