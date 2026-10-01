@@ -2,65 +2,120 @@ package com.callbridge.phoneb
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.GridLayout
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 
 class DialerFragment : Fragment(R.layout.fragment_dialer) {
 
+    private var number = ""
+    private var holdHandler: Handler? = null
+    private var holdRunnable: Runnable? = null
+    private lateinit var tvNumber: TextView
+    private lateinit var btnBackspace: ImageButton
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val etNumber = view.findViewById<EditText>(R.id.etDialNumber)
-        val btnCall = view.findViewById<Button>(R.id.btnCall)
-        val btnBackspace = view.findViewById<View>(R.id.btnBackspace)
-        val tvDialStatus = view.findViewById<TextView>(R.id.tvDialStatus)
-        val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
+        tvNumber     = view.findViewById(R.id.tvDialNumber)
+        btnBackspace = view.findViewById(R.id.btnBackspace)
+        val btnCall      = view.findViewById<Button>(R.id.btnCall)
+        val tvStatus     = view.findViewById<TextView>(R.id.tvDialStatus)
+        val gridKeys     = view.findViewById<GridLayout>(R.id.gridKeys)
 
+        holdHandler = Handler(Looper.getMainLooper())
+
+        // Keypad
         for (i in 0 until gridKeys.childCount) {
             val child = gridKeys.getChildAt(i)
-            val key = child.tag as? String
-            if (key != null) {
-                child.setOnClickListener { etNumber.append(key) }
+            val key = child.tag as? String ?: continue
+            child.setOnClickListener { appendDigit(key) }
+            // Long-press 0 → +
+            if (key == "0") {
+                child.setOnLongClickListener {
+                    if (number.endsWith("0")) number = number.dropLast(1)
+                    appendDigit("+")
+                    true
+                }
             }
         }
 
+        // Backspace — tap: delete one / hold: clear all
         btnBackspace.setOnClickListener {
-            val text = etNumber.text
-            if (text.isNotEmpty()) etNumber.setText(text.dropLast(1))
+            if (number.isNotEmpty()) {
+                number = number.dropLast(1)
+                updateDisplay()
+            }
+        }
+        btnBackspace.setOnLongClickListener {
+            number = ""
+            updateDisplay()
+            true
         }
 
+        // Call
         btnCall.setOnClickListener {
-            val number = etNumber.text.toString().trim()
-            if (number.isEmpty()) {
-                tvDialStatus.text = "Enter a number first"
+            val n = number.trim()
+            if (n.isEmpty()) {
+                tvStatus.text = "Enter a number first"
                 return@setOnClickListener
             }
             if (!TransportManager.isConnected()) {
-                tvDialStatus.text = "⚠️ Not connected to Phone A"
+                tvStatus.text = "⚠️ Not connected to Phone A"
                 return@setOnClickListener
             }
-            // Set state BEFORE launching the activity so it's already
-            // correct by the time onCreate reads it — no race with the
-            // STATE|DIALING broadcast that follows shortly after.
-            CallStateStore.setCall(number, outgoing = true)
+            CallStateStore.setCall(n, outgoing = true)
             CallStateStore.update("DIALING")
+            TransportManager.send("DIAL|$n")
+            startActivity(
+                Intent(requireContext(), IncomingCallActivity::class.java).apply {
+                    putExtra("caller_number", n)
+                    putExtra("outgoing", true)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            )
+            tvStatus.text = ""
+        }
 
-            TransportManager.send("DIAL|$number")
-            val intent = Intent(requireContext(), IncomingCallActivity::class.java).apply {
-                putExtra("caller_number", number)
-                putExtra("outgoing", true)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        updateDisplay()
+    }
+
+    private fun appendDigit(digit: String) {
+        if (number.length >= 18) return
+        number += digit
+        updateDisplay()
+    }
+
+    private fun updateDisplay() {
+        if (number.isEmpty()) {
+            tvNumber.text = ""
+            tvNumber.hint = "Enter number"
+            btnBackspace.visibility = View.INVISIBLE
+        } else {
+            tvNumber.text = number
+            tvNumber.hint = ""
+            btnBackspace.visibility = View.VISIBLE
+            // Scale font down for long numbers
+            tvNumber.textSize = when {
+                number.length > 14 -> 24f
+                number.length > 10 -> 30f
+                else -> 36f
             }
-            startActivity(intent)
-            tvDialStatus.text = ""
         }
     }
 
-    fun setNumber(number: String) {
-        view?.findViewById<EditText>(R.id.etDialNumber)?.setText(number)
+    fun setNumber(n: String) {
+        number = n
+        if (isAdded) updateDisplay()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        holdHandler = null
     }
 }
