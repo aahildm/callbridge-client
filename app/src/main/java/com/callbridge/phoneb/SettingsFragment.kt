@@ -1,7 +1,8 @@
 package com.callbridge.phoneb
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
+import android.app.AlertDialog
+import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -16,14 +17,21 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val btnConnect       = view.findViewById<Button>(R.id.btnConnect)
-        val btnBattery       = view.findViewById<Button>(R.id.btnBatteryFix)
-        val tvPairedDevice   = view.findViewById<TextView>(R.id.tvPairedDevice)
-        val btnRestartApp    = view.findViewById<Button>(R.id.btnRestartApp)
+        val btnConnect         = view.findViewById<Button>(R.id.btnConnect)
+        val btnBattery         = view.findViewById<Button>(R.id.btnBatteryFix)
+        val tvPairedDevice     = view.findViewById<TextView>(R.id.tvPairedDevice)
+        val btnRestartApp      = view.findViewById<Button>(R.id.btnRestartApp)
         val btnPopupPermission = view.findViewById<Button>(R.id.btnPopupPermission)
 
         updateBatteryButton(btnBattery)
         updatePairedDeviceInfo(tvPairedDevice)
+
+        // Wire picker so BluetoothClient can ask us to show a device list
+        BluetoothClient.onPickDevice = { devices ->
+            requireActivity().runOnUiThread {
+                showDevicePicker(devices, tvPairedDevice)
+            }
+        }
 
         btnConnect.setOnClickListener {
             startClientService()
@@ -50,6 +58,25 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    private fun showDevicePicker(devices: List<BluetoothDevice>, tvPairedDevice: TextView) {
+        val names = devices.map { it.name ?: it.address }.toTypedArray()
+        AlertDialog.Builder(requireContext())
+            .setTitle("Select Phone A (server device)")
+            .setItems(names) { _, idx ->
+                val chosen = devices[idx]
+                BluetoothClient.saveDeviceName(chosen.name ?: chosen.address)
+                updatePairedDeviceInfo(tvPairedDevice)
+                // Now actually connect to the chosen device
+                startClientService()
+                TransportManager.connect()
+                Toast.makeText(requireContext(),
+                    "Connecting to ${chosen.name}...", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun startClientService() {
         val serviceIntent = Intent(requireContext(), ClientService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -61,16 +88,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
 
     @SuppressLint("MissingPermission")
     private fun updatePairedDeviceInfo(tv: TextView) {
-        try {
-            val adapter = BluetoothAdapter.getDefaultAdapter()
-            val device = adapter?.bondedDevices?.firstOrNull()
-            tv.text = if (device != null) {
-                "✅ Paired with: ${device.name} — ready to connect"
-            } else {
-                "⚠️ No paired Bluetooth device found.\nPair with Phone A in system Bluetooth settings first."
-            }
-        } catch (e: Exception) {
-            tv.text = "Bluetooth status unavailable"
+        val savedName = BluetoothClient.getSavedDeviceName()
+        tv.text = if (savedName != null) {
+            "✅ Server device: $savedName — tap Connect to link"
+        } else {
+            "⚠️ No server device selected — tap Connect to pick one from your paired devices"
         }
     }
 

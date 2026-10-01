@@ -16,6 +16,7 @@ object BluetoothClient {
     private val TAG = "CallBridge-BtClient"
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private const val SECRET = "callbridge123"
+    private const val PREFS_KEY = "bt_server_device_name"
 
     private var appContext: Context? = null
     private var socket: BluetoothSocket? = null
@@ -25,23 +26,40 @@ object BluetoothClient {
     private var connectThread: Thread? = null
 
     var onEvent: ((String) -> Unit)? = null
+    /** Called when no saved device is set and user must pick one from the list */
+    var onPickDevice: ((List<BluetoothDevice>) -> Unit)? = null
 
     fun init(context: Context) {
         appContext = context.applicationContext
     }
 
     @SuppressLint("MissingPermission")
-    private fun bondedDevice(): BluetoothDevice? {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
-        return adapter.bondedDevices?.firstOrNull()
+    fun getBondedDevices(): List<BluetoothDevice> {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+        return adapter.bondedDevices?.toList() ?: emptyList()
     }
 
-    /**
-     * Attempts a Bluetooth connection. Returns true only if the attempt was
-     * actually started — callers should watch onEvent for the real outcome
-     * ("CONNECTED" or a "STATUS|..." failure reason), since connect() itself
-     * runs asynchronously on a background thread.
-     */
+    fun getSavedDeviceName(): String? {
+        return appContext?.getSharedPreferences("callbridge", Context.MODE_PRIVATE)
+            ?.getString(PREFS_KEY, null)
+    }
+
+    fun saveDeviceName(name: String) {
+        appContext?.getSharedPreferences("callbridge", Context.MODE_PRIVATE)
+            ?.edit()?.putString(PREFS_KEY, name)?.apply()
+    }
+
+    fun clearSavedDevice() {
+        appContext?.getSharedPreferences("callbridge", Context.MODE_PRIVATE)
+            ?.edit()?.remove(PREFS_KEY)?.apply()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun findTargetDevice(): BluetoothDevice? {
+        val savedName = getSavedDeviceName() ?: return null
+        return getBondedDevices().firstOrNull { it.name == savedName }
+    }
+
     @SuppressLint("MissingPermission")
     fun connect(): Boolean {
         disconnect()
@@ -54,8 +72,17 @@ object BluetoothClient {
             onEvent?.invoke("STATUS|Bluetooth is turned off — enable it in settings")
             return false
         }
-        val device = bondedDevice() ?: run {
-            onEvent?.invoke("STATUS|No paired device — pair with Phone A in Bluetooth settings first")
+        val bonded = getBondedDevices()
+        if (bonded.isEmpty()) {
+            onEvent?.invoke("STATUS|No paired devices — pair with Phone A in Bluetooth settings first")
+            return false
+        }
+
+        val device = findTargetDevice()
+        if (device == null) {
+            // No saved device — ask UI to show picker
+            onEvent?.invoke("STATUS|Select which paired device is Phone A (server)...")
+            onPickDevice?.invoke(bonded)
             return false
         }
 
@@ -70,12 +97,12 @@ object BluetoothClient {
                 out = s.outputStream
                 authenticated = false
                 Log.d(TAG, "BT connected to ${device.name} — authenticating")
-                onEvent?.invoke("STATUS|Connected — authenticating...")
+                onEvent?.invoke("STATUS|Connected to ${device.name} — authenticating...")
                 sendRaw("AUTH|$SECRET")
                 startReadLoop(s)
             } catch (e: Exception) {
                 Log.e(TAG, "Bluetooth connect failed: ${e.message}")
-                onEvent?.invoke("STATUS|Bluetooth connect failed: ${e.message ?: "unknown error"}")
+                onEvent?.invoke("STATUS|Connect to ${device?.name} failed: ${e.message ?: "unknown error"}")
                 onEvent?.invoke("DISCONNECTED")
             }
         }
@@ -106,7 +133,6 @@ object BluetoothClient {
             AudioClient.onBluetoothAudio(message.removePrefix("AUDIO|"))
             return
         }
-
         Log.d(TAG, "Received (BT): $message")
         when (message) {
             "AUTH|OK" -> {
@@ -135,10 +161,6 @@ object BluetoothClient {
     }
 
     fun send(message: String) = sendRaw(message)
-    fun answer() = send("ANSWER")
-    fun reject() = send("REJECT")
-    fun hangup() = send("HANGUP")
-    fun sendSms(number: String, body: String) = send("SMS_SEND|$number|$body")
 
     fun disconnect() {
         try { socket?.close() } catch (_: Exception) {}
