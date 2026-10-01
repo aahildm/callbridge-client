@@ -13,50 +13,19 @@
         android:textStyle="bold"
         android:layout_marginBottom="16dp" />
 
-    <EditText
-        android:id="@+id/etPhoneAIp"
+    <TextView
+        android:id="@+id/tvPairedDevice"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Phone A IP (e.g. 192.168.1.100)"
-        android:inputType="text"
+        android:textSize="13sp"
+        android:textColor="#888888"
         android:layout_marginBottom="12dp" />
 
     <Button
         android:id="@+id/btnConnect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Connect to Phone A"
-        android:layout_marginBottom="10dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="10dp">
-
-        <Button
-            android:id="@+id/btnForceWifi"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📶 Use WiFi"
-            android:layout_marginEnd="6dp" />
-
-        <Button
-            android:id="@+id/btnForceBluetooth"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🔵 Use Bluetooth" />
-
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvPairedDevice"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:textColor="#888888"
+        android:text="🔵 Connect via Bluetooth"
         android:layout_marginBottom="10dp" />
 
     <Button
@@ -66,8 +35,6 @@
         android:text="⚠️ Fix Battery Optimization"
         android:layout_marginBottom="10dp" />
 
-    <!-- Critical for HyperOS/MIUI — without this, incoming call popups
-         silently degrade to plain notifications -->
     <Button
         android:id="@+id/btnPopupPermission"
         android:layout_width="match_parent"
@@ -89,7 +56,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Enter the IP shown on Phone A's screen, then tap Connect. If incoming calls only show as a notification instead of popping up, tap 'Enable Call Popup Permission' above."
+        android:text="Make sure Phone A (server) is paired with this phone in Bluetooth settings before connecting. If incoming calls only show as a notification instead of popping up, tap Enable Call Popup Permission."
         android:textSize="13sp"
         android:layout_marginTop="16dp"
         android:gravity="center"
