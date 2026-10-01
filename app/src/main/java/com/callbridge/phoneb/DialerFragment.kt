@@ -2,8 +2,6 @@ package com.callbridge.phoneb
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
@@ -14,8 +12,6 @@ import androidx.fragment.app.Fragment
 class DialerFragment : Fragment(R.layout.fragment_dialer) {
 
     private var number = ""
-    private var holdHandler: Handler? = null
-    private var holdRunnable: Runnable? = null
     private lateinit var tvNumber: TextView
     private lateinit var btnBackspace: ImageButton
 
@@ -24,13 +20,11 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
 
         tvNumber     = view.findViewById(R.id.tvDialNumber)
         btnBackspace = view.findViewById(R.id.btnBackspace)
-        val btnCall      = view.findViewById<Button>(R.id.btnCall)
-        val tvStatus     = view.findViewById<TextView>(R.id.tvDialStatus)
-        val gridKeys     = view.findViewById<GridLayout>(R.id.gridKeys)
+        val btnCall  = view.findViewById<Button>(R.id.btnCall)
+        val tvStatus = view.findViewById<TextView>(R.id.tvDialStatus)
+        val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
 
-        holdHandler = Handler(Looper.getMainLooper())
-
-        // Keypad
+        // Keypad digit clicks
         for (i in 0 until gridKeys.childCount) {
             val child = gridKeys.getChildAt(i)
             val key = child.tag as? String ?: continue
@@ -45,7 +39,7 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
             }
         }
 
-        // Backspace — tap: delete one / hold: clear all
+        // Backspace: tap = delete one, long-press = clear all
         btnBackspace.setOnClickListener {
             if (number.isNotEmpty()) {
                 number = number.dropLast(1)
@@ -58,7 +52,7 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
             true
         }
 
-        // Call
+        // Call button
         btnCall.setOnClickListener {
             val n = number.trim()
             if (n.isEmpty()) {
@@ -100,7 +94,6 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
             tvNumber.text = number
             tvNumber.hint = ""
             btnBackspace.visibility = View.VISIBLE
-            // Scale font down for long numbers
             tvNumber.textSize = when {
                 number.length > 14 -> 24f
                 number.length > 10 -> 30f
@@ -112,10 +105,5 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
     fun setNumber(n: String) {
         number = n
         if (isAdded) updateDisplay()
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        holdHandler = null
     }
 }
