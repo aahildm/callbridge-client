@@ -5,41 +5,29 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 
 class ClientService : Service() {
-
     private val TAG = "CallBridge-ClientSvc"
     private val CHANNEL_ID = "callbridge_client"
     private val CALL_CHANNEL_ID = "callbridge_incoming_call"
     private val NOTIF_ID = 2
     private val CALL_NOTIF_ID = 3
 
-    private var phoneAIp = ""
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
         startForeground(NOTIF_ID, buildNotification("Starting..."))
-
-        val prefs = getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-        phoneAIp = prefs.getString("phone_a_ip", "") ?: ""
-
         TransportManager.init(this)
         TransportManager.onEvent = { event -> handleEvent(event) }
-
-        if (phoneAIp.isNotEmpty()) {
-            TransportManager.connect(phoneAIp)
-        }
+        TransportManager.connect()
     }
 
     private fun handleEvent(event: String) {
         if (!event.startsWith("CALLLOG|")) Log.d(TAG, "Event: $event")
-
         when {
             event.startsWith("STATUS|") -> {
                 val msg = event.removePrefix("STATUS|")
@@ -47,18 +35,16 @@ class ClientService : Service() {
                 broadcastStatus(msg)
             }
             event == "CONNECTED" -> {
-                val transport = TransportManager.activeTransportName()
-                updateNotification("✅ Connected via $transport")
-                broadcastStatus("CONNECTED|$transport")
+                updateNotification("✅ Connected via Bluetooth")
+                broadcastStatus("CONNECTED|Bluetooth")
                 TransportManager.send("GET_CALLLOG")
-            }
-            event == "FALLBACK_BLUETOOTH" -> {
-                updateNotification("🔄 WiFi failed — trying Bluetooth...")
-                broadcastStatus("WiFi failed — trying Bluetooth...")
             }
             event == "DISCONNECTED" -> {
                 updateNotification("🔴 Disconnected — retrying...")
                 broadcastStatus("DISCONNECTED")
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    TransportManager.connect()
+                }, 5000)
             }
             event.startsWith("RING|") -> {
                 val number = event.removePrefix("RING|")
@@ -66,17 +52,13 @@ class ClientService : Service() {
                 CallStateStore.update("RINGING")
                 showIncomingCallNotification(number)
             }
-            event == "STATE|DIALING" -> {
-                CallStateStore.update("DIALING")
-            }
+            event == "STATE|DIALING" -> CallStateStore.update("DIALING")
             event == "STATE|ACTIVE" -> {
-                AudioClient.start(phoneAIp)
+                AudioClient.start()
                 CallStateStore.update("ACTIVE")
                 getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
             }
-            event == "STATE|HOLDING" -> {
-                CallStateStore.update("HOLDING")
-            }
+            event == "STATE|HOLDING" -> CallStateStore.update("HOLDING")
             event == "ENDED" -> {
                 AudioClient.stop()
                 CallStateStore.update("ENDED")
@@ -88,178 +70,82 @@ class ClientService : Service() {
             event.startsWith("SMS_IN|") -> {
                 val parts = event.removePrefix("SMS_IN|").split("|", limit = 3)
                 if (parts.size == 3) {
-                    val msg = SmsStore.Message(
-                        sender = parts[0],
-                        body = parts[2],
-                        timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(),
-                        incoming = true
-                    )
+                    val msg = SmsStore.Message(sender = parts[0], body = parts[2],
+                        timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(), incoming = true)
                     SmsStore.add(msg)
                     showSmsNotification(msg)
                 }
             }
-            event.startsWith("CALLLOG|") -> {
-                CallLogStore.update(event.removePrefix("CALLLOG|"))
-            }
-            event.startsWith("DIAL_FAIL|") -> {
-                broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
-            }
+            event.startsWith("CALLLOG|") -> CallLogStore.update(event.removePrefix("CALLLOG|"))
+            event.startsWith("DIAL_FAIL|") -> broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
         }
     }
 
     private fun broadcastStatus(status: String) {
-        sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply {
-            putExtra("status", status)
-        })
-    }
-
-    private fun broadcastCallState(state: String) {
-        sendBroadcast(Intent("com.callbridge.phoneb.CALL_STATE").apply {
-            putExtra("state", state)
-        })
+        sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply { putExtra("status", status) })
     }
 
     private fun showIncomingCallNotification(number: String) {
-        // Android 14+ has an explicit toggle for full-screen intent permission
-        // that can be off even when the manifest declares USE_FULL_SCREEN_INTENT —
-        // detect it so we can tell the user exactly why the popup isn't showing.
         if (Build.VERSION.SDK_INT >= 34) {
             val nm = getSystemService(NotificationManager::class.java)
-            if (nm?.canUseFullScreenIntent() == false) {
-                Log.w(TAG, "Full-screen intent permission is OFF — popup will not show")
-                broadcastStatus("⚠️ Call popup blocked — enable in Setup tab")
-            }
+            if (nm?.canUseFullScreenIntent() == false) broadcastStatus("⚠️ Call popup blocked — enable in Setup tab")
         }
-
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            putExtra("caller_number", number)
-            action = "INCOMING_CALL"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_NO_USER_ACTION or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("caller_number", number); action = "INCOMING_CALL"
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this, 0, fullScreenIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
+        val fsPendingIntent = PendingIntent.getActivity(this, 0, fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CALL_CHANNEL_ID)
-                .setContentTitle("Incoming call")
-                .setContentText(number)
-                .setSmallIcon(android.R.drawable.ic_menu_call)
-                .setPriority(Notification.PRIORITY_MAX)
-                .setCategory(Notification.CATEGORY_CALL)
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-                .setContentIntent(fullScreenPendingIntent)
-                .setOngoing(true)
-                .build()
+            Notification.Builder(this, CALL_CHANNEL_ID).setContentTitle("Incoming call").setContentText(number)
+                .setSmallIcon(android.R.drawable.ic_menu_call).setPriority(Notification.PRIORITY_MAX)
+                .setCategory(Notification.CATEGORY_CALL).setFullScreenIntent(fsPendingIntent, true)
+                .setContentIntent(fsPendingIntent).setOngoing(true).build()
         } else {
             @Suppress("DEPRECATION")
-            Notification.Builder(this)
-                .setContentTitle("Incoming call")
-                .setContentText(number)
-                .setSmallIcon(android.R.drawable.ic_menu_call)
-                .setPriority(Notification.PRIORITY_MAX)
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-                .setContentIntent(fullScreenPendingIntent)
-                .setOngoing(true)
-                .build()
+            Notification.Builder(this).setContentTitle("Incoming call").setContentText(number)
+                .setSmallIcon(android.R.drawable.ic_menu_call).setPriority(Notification.PRIORITY_MAX)
+                .setFullScreenIntent(fsPendingIntent, true).setContentIntent(fsPendingIntent).setOngoing(true).build()
         }
-
         getSystemService(NotificationManager::class.java)?.notify(CALL_NOTIF_ID, notif)
-        // Always also try a direct launch — on HyperOS/MIUI the full-screen
-        // intent alone is frequently suppressed even with permission granted,
-        // but a direct startActivity from a running foreground service call
-        // often still succeeds.
-        try {
-            startActivity(fullScreenIntent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Direct launch also failed: ${e.message}")
-        }
+        try { startActivity(fullScreenIntent) } catch (e: Exception) { Log.e(TAG, "Direct launch failed: ${e.message}") }
     }
 
     private fun showSmsNotification(msg: SmsStore.Message) {
-        val intent = Intent(this, SmsActivity::class.java)
-        val pi = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notif = buildNotifBuilder(CHANNEL_ID)
-            .setContentTitle("SMS from ${msg.sender}")
-            .setContentText(msg.body)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentIntent(pi)
-            .setAutoCancel(true)
-            .build()
-        getSystemService(NotificationManager::class.java)
-            ?.notify(msg.sender.hashCode(), notif)
+        val pi = PendingIntent.getActivity(this, 0, Intent(this, SmsActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notif = buildNotifBuilder(CHANNEL_ID).setContentTitle("SMS from ${msg.sender}")
+            .setContentText(msg.body).setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentIntent(pi).setAutoCancel(true).build()
+        getSystemService(NotificationManager::class.java)?.notify(msg.sender.hashCode(), notif)
     }
 
     private fun updateNotification(text: String) {
-        getSystemService(NotificationManager::class.java)
-            ?.notify(NOTIF_ID, buildNotification(text))
+        getSystemService(NotificationManager::class.java)?.notify(NOTIF_ID, buildNotification(text))
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val newIp = intent?.getStringExtra("phone_a_ip")
-        if (!newIp.isNullOrEmpty() && newIp != phoneAIp) {
-            phoneAIp = newIp
-            getSharedPreferences("callbridge", Context.MODE_PRIVATE)
-                .edit().putString("phone_a_ip", newIp).apply()
-            TransportManager.connect(newIp)
-        }
-        return START_STICKY
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        TransportManager.disconnect()
-        AudioClient.stop()
-    }
-
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+    override fun onDestroy() { super.onDestroy(); TransportManager.disconnect(); AudioClient.stop() }
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
-            nm?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID, "CallBridge", NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    description = "CallBridge connection status"
-                    setShowBadge(false)
-                }
-            )
-            nm?.createNotificationChannel(
-                NotificationChannel(
-                    CALL_CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "CallBridge incoming call alerts"
-                    setShowBadge(true)
-                    setSound(null, null)
-                }
-            )
+            nm?.createNotificationChannel(NotificationChannel(CHANNEL_ID, "CallBridge", NotificationManager.IMPORTANCE_LOW)
+                .apply { description = "CallBridge connection status"; setShowBadge(false) })
+            nm?.createNotificationChannel(NotificationChannel(CALL_CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "CallBridge incoming call alerts"; setShowBadge(true); setSound(null, null) })
         }
     }
 
     private fun buildNotifBuilder(channelId: String = CHANNEL_ID): Notification.Builder {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.ic_menu_call)
-                .setOngoing(true)
-        } else {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            Notification.Builder(this, channelId).setSmallIcon(android.R.drawable.ic_menu_call).setOngoing(true)
+        else {
             @Suppress("DEPRECATION")
-            Notification.Builder(this)
-                .setSmallIcon(android.R.drawable.ic_menu_call)
-                .setOngoing(true)
+            Notification.Builder(this).setSmallIcon(android.R.drawable.ic_menu_call).setOngoing(true)
         }
     }
 
-    private fun buildNotification(text: String): Notification {
-        return buildNotifBuilder()
-            .setContentTitle("CallBridge")
-            .setContentText(text)
-            .build()
-    }
+    private fun buildNotification(text: String) = buildNotifBuilder().setContentTitle("CallBridge").setContentText(text).build()
 }
