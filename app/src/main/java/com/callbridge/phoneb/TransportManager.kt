@@ -16,7 +16,10 @@ object TransportManager {
         Log.d(TAG, "Connecting via Bluetooth")
         onEvent?.invoke("STATUS|Connecting via Bluetooth...")
         val ok = BluetoothClient.connect()
-        if (!ok) onEvent?.invoke("DISCONNECTED")
+        // Only fire DISCONNECTED if connect truly failed (not just waiting for device pick)
+        if (!ok && BluetoothClient.getSavedDeviceName() != null) {
+            onEvent?.invoke("DISCONNECTED")
+        }
     }
 
     fun send(message: String) = BluetoothClient.send(message)

@@ -147,5 +147,17 @@ class ClientService : Service() {
         }
     }
 
-    private fun buildNotification(text: String) = buildNotifBuilder().setContentTitle("CallBridge").setContentText(text).build()
+    private fun buildMainIntent(): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    private fun buildNotification(text: String) = buildNotifBuilder()
+        .setContentTitle("CallBridge")
+        .setContentText(text)
+        .setContentIntent(buildMainIntent())
+        .build()
 }
