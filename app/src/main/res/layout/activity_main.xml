@@ -3,39 +3,59 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F5F5">
+    android:background="@color/bg_primary">
 
-    <!-- Status bar -->
+    <!-- App header -->
     <LinearLayout
-        android:id="@+id/statusBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:background="#FFFFFF"
-        android:elevation="2dp">
+        android:orientation="horizontal"
+        android:background="@color/brand_blue"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp"
+        android:gravity="center_vertical"
+        android:elevation="4dp">
 
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="CallBridge"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:letterSpacing="0.01" />
+
+        <!-- Status pill -->
         <TextView
             android:id="@+id/tvStatus"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#212121"
-            android:gravity="center"
-            android:text="Connecting..." />
+            android:text="Connecting…"
+            android:textSize="12sp"
+            android:textColor="@color/status_connecting_text"
+            android:background="@drawable/bg_status_pill"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp" />
 
-        <TextView
-            android:id="@+id/tvTransport"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:gravity="center"
-            android:textColor="#757575"
-            android:visibility="gone" />
     </LinearLayout>
+
+    <!-- Transport sub-line -->
+    <TextView
+        android:id="@+id/tvTransport"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="11sp"
+        android:textColor="#FFFFFF"
+        android:gravity="center"
+        android:background="@color/brand_blue_dark"
+        android:paddingBottom="6dp"
+        android:visibility="gone" />
 
     <!-- Tab content -->
     <FrameLayout
@@ -47,59 +67,91 @@
     <!-- Bottom nav -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="64dp"
         android:orientation="horizontal"
-        android:background="#FFFFFF"
-        android:elevation="8dp">
+        android:background="@color/nav_bg"
+        android:elevation="12dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
 
         <LinearLayout android:id="@+id/tabDialer"
             android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:orientation="vertical"
-            android:gravity="center" android:background="?attr/selectableItemBackground">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="⌨" android:textSize="20sp" android:gravity="center"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Dialer" android:textSize="10sp" android:textColor="#757575"/>
+            android:gravity="center" android:padding="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <TextView android:id="@+id/navIconDialer"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⌨" android:textSize="22sp" android:gravity="center"
+                android:textColor="@color/nav_selected"/>
+            <TextView android:id="@+id/navLabelDialer"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Dialer" android:textSize="10sp"
+                android:textColor="@color/nav_selected" android:textStyle="bold"
+                android:layout_marginTop="2dp"/>
         </LinearLayout>
 
         <LinearLayout android:id="@+id/tabCallLog"
             android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:orientation="vertical"
-            android:gravity="center" android:background="?attr/selectableItemBackground">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="📋" android:textSize="20sp" android:gravity="center"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Calls" android:textSize="10sp" android:textColor="#757575"/>
+            android:gravity="center" android:padding="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <TextView android:id="@+id/navIconCalls"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📋" android:textSize="22sp" android:gravity="center"
+                android:textColor="@color/nav_unselected"/>
+            <TextView android:id="@+id/navLabelCalls"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Calls" android:textSize="10sp"
+                android:textColor="@color/nav_unselected"
+                android:layout_marginTop="2dp"/>
         </LinearLayout>
 
         <LinearLayout android:id="@+id/tabContacts"
             android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:orientation="vertical"
-            android:gravity="center" android:background="?attr/selectableItemBackground">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="👥" android:textSize="20sp" android:gravity="center"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Contacts" android:textSize="10sp" android:textColor="#757575"/>
+            android:gravity="center" android:padding="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <TextView android:id="@+id/navIconContacts"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="👥" android:textSize="22sp" android:gravity="center"
+                android:textColor="@color/nav_unselected"/>
+            <TextView android:id="@+id/navLabelContacts"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Contacts" android:textSize="10sp"
+                android:textColor="@color/nav_unselected"
+                android:layout_marginTop="2dp"/>
         </LinearLayout>
 
         <LinearLayout android:id="@+id/tabSms"
             android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:orientation="vertical"
-            android:gravity="center" android:background="?attr/selectableItemBackground">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="💬" android:textSize="20sp" android:gravity="center"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="SMS" android:textSize="10sp" android:textColor="#757575"/>
+            android:gravity="center" android:padding="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <TextView android:id="@+id/navIconSms"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="💬" android:textSize="22sp" android:gravity="center"
+                android:textColor="@color/nav_unselected"/>
+            <TextView android:id="@+id/navLabelSms"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SMS" android:textSize="10sp"
+                android:textColor="@color/nav_unselected"
+                android:layout_marginTop="2dp"/>
         </LinearLayout>
 
         <LinearLayout android:id="@+id/tabSettings"
             android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:orientation="vertical"
-            android:gravity="center" android:background="?attr/selectableItemBackground">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="⚙" android:textSize="20sp" android:gravity="center"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Setup" android:textSize="10sp" android:textColor="#757575"/>
+            android:gravity="center" android:padding="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <TextView android:id="@+id/navIconSettings"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⚙" android:textSize="22sp" android:gravity="center"
+                android:textColor="@color/nav_unselected"/>
+            <TextView android:id="@+id/navLabelSettings"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Setup" android:textSize="10sp"
+                android:textColor="@color/nav_unselected"
+                android:layout_marginTop="2dp"/>
         </LinearLayout>
 
     </LinearLayout>

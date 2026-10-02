@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -34,33 +36,50 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTransport: TextView
     private var batteryDialogShown = false
 
+    // Nav items: (tab layout, icon view, label view)
+    private data class NavItem(val tab: LinearLayout, val icon: TextView, val label: TextView)
+    private lateinit var navItems: List<NavItem>
+    private var selectedTabIndex = 0
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val status = intent.getStringExtra("status") ?: return
             when {
                 status.startsWith("CONNECTED|") -> {
                     val transport = status.removePrefix("CONNECTED|")
-                    tvStatus.text = "✅ Connected to Phone A"
+                    setStatusPill("Connected", StatusType.CONNECTED)
                     val transportText = when (transport) {
-                        "WiFi" -> "📶 WiFi  (audio + control)"
-                        "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
-                        else -> ""
+                        "WiFi"      -> "📶  Wi-Fi  ·  audio + control"
+                        "Bluetooth" -> "🔵  Bluetooth  ·  audio + control"
+                        else        -> ""
                     }
                     tvTransport.text = transportText
                     tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
                 }
                 status == "DISCONNECTED" -> {
-                    tvStatus.text = "🔴 Disconnected"
-                    tvTransport.text = ""
+                    setStatusPill("Disconnected", StatusType.DISCONNECTED)
                     tvTransport.visibility = View.GONE
                 }
                 else -> {
-                    tvStatus.text = status
-                    tvTransport.text = ""
+                    setStatusPill(status.removePrefix("STATUS|"), StatusType.CONNECTING)
                     tvTransport.visibility = View.GONE
                 }
             }
         }
+    }
+
+    enum class StatusType { CONNECTED, DISCONNECTED, CONNECTING }
+
+    private fun setStatusPill(text: String, type: StatusType) {
+        tvStatus.text = text
+        val (bg, fg) = when (type) {
+            StatusType.CONNECTED    -> getColor(R.color.status_connected_bg) to getColor(R.color.status_connected_text)
+            StatusType.DISCONNECTED -> getColor(R.color.status_disconnected_bg) to getColor(R.color.status_disconnected_text)
+            StatusType.CONNECTING   -> getColor(R.color.status_connecting_bg) to getColor(R.color.status_connecting_text)
+        }
+        tvStatus.setTextColor(fg)
+        (tvStatus.background as? GradientDrawable)?.setColor(bg)
+            ?: tvStatus.setBackgroundColor(bg)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,37 +89,54 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tvStatus)
         tvTransport = findViewById(R.id.tvTransport)
 
-        val tabDialer = findViewById<android.widget.LinearLayout>(R.id.tabDialer)
-        val tabCallLog = findViewById<android.widget.LinearLayout>(R.id.tabCallLog)
-        val tabContacts = findViewById<android.widget.LinearLayout>(R.id.tabContacts)
-        val tabSms = findViewById<android.widget.LinearLayout>(R.id.tabSms)
-        val tabSettings = findViewById<android.widget.LinearLayout>(R.id.tabSettings)
+        val tabDialer   = findViewById<LinearLayout>(R.id.tabDialer)
+        val tabCallLog  = findViewById<LinearLayout>(R.id.tabCallLog)
+        val tabContacts = findViewById<LinearLayout>(R.id.tabContacts)
+        val tabSms      = findViewById<LinearLayout>(R.id.tabSms)
+        val tabSettings = findViewById<LinearLayout>(R.id.tabSettings)
 
-        tabDialer.setOnClickListener { showFragment(DialerFragment()) }
-        tabCallLog.setOnClickListener { showFragment(CallLogFragment()) }
-        tabContacts.setOnClickListener { showFragment(ContactsFragment()) }
-        tabSms.setOnClickListener { startActivity(Intent(this, SmsActivity::class.java)) }
-        tabSettings.setOnClickListener { showFragment(SettingsFragment()) }
+        navItems = listOf(
+            NavItem(tabDialer,   findViewById(R.id.navIconDialer),   findViewById(R.id.navLabelDialer)),
+            NavItem(tabCallLog,  findViewById(R.id.navIconCalls),    findViewById(R.id.navLabelCalls)),
+            NavItem(tabContacts, findViewById(R.id.navIconContacts), findViewById(R.id.navLabelContacts)),
+            NavItem(tabSms,      findViewById(R.id.navIconSms),      findViewById(R.id.navLabelSms)),
+            NavItem(tabSettings, findViewById(R.id.navIconSettings), findViewById(R.id.navLabelSettings))
+        )
 
-        // Default tab
+        tabDialer.setOnClickListener   { selectTab(0, DialerFragment()) }
+        tabCallLog.setOnClickListener  { selectTab(1, CallLogFragment()) }
+        tabContacts.setOnClickListener { selectTab(2, ContactsFragment()) }
+        tabSms.setOnClickListener      { startActivity(Intent(this, SmsActivity::class.java)) }
+        tabSettings.setOnClickListener { selectTab(4, SettingsFragment()) }
+
         if (savedInstanceState == null) {
-            showFragment(DialerFragment())
+            selectTab(0, DialerFragment())
         }
 
         requestMissingPermissions()
     }
 
-    private fun showFragment(fragment: Fragment) {
+    private fun selectTab(index: Int, fragment: Fragment) {
+        selectedTabIndex = index
+        val selected   = ContextCompat.getColor(this, R.color.nav_selected)
+        val unselected = ContextCompat.getColor(this, R.color.nav_unselected)
+
+        navItems.forEachIndexed { i, item ->
+            val color = if (i == index) selected else unselected
+            item.icon.setTextColor(color)
+            item.label.setTextColor(color)
+            item.label.setTypeface(null, if (i == index) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        }
+
         supportFragmentManager.beginTransaction()
             .replace(R.id.tabContent, fragment)
             .commit()
     }
 
-    /** Called by CallLogFragment when user taps call-back on a log entry. */
+    /** Called by CallLogFragment / ContactsFragment when user taps a number. */
     fun goToDialerWithNumber(number: String) {
         val fragment = DialerFragment()
-        showFragment(fragment)
-        // setNumber runs after the fragment view is created
+        selectTab(0, fragment)
         supportFragmentManager.executePendingTransactions()
         fragment.setNumber(number)
     }
@@ -115,11 +151,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (TransportManager.isConnected()) {
-            tvStatus.text = "✅ Connected to Phone A"
+            setStatusPill("Connected", StatusType.CONNECTED)
             val transportText = when (TransportManager.activeTransportName()) {
-                "WiFi" -> "📶 WiFi  (audio + control)"
-                "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
-                else -> ""
+                "WiFi"      -> "📶  Wi-Fi  ·  audio + control"
+                "Bluetooth" -> "🔵  Bluetooth  ·  audio + control"
+                else        -> ""
             }
             tvTransport.text = transportText
             tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE

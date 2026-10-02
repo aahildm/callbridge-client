@@ -65,9 +65,10 @@ object AudioClient {
         }
 
         // Playback track: receives the remote caller's voice (from server)
+        // Use the minimum viable buffer (2× min) to minimise playback latency.
         val minOut = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_OUT, ENCODING)
-        val outBuf = maxOf(minOut * 2, FRAME_BYTES * 4)
-        btPlayer = AudioTrack(
+        val outBuf = maxOf(minOut * 2, FRAME_BYTES * 2)
+        val track = AudioTrack(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -79,11 +80,21 @@ object AudioClient {
                 .build(),
             outBuf, AudioTrack.MODE_STREAM,
             audioManager?.generateAudioSessionId() ?: AudioManager.AUDIO_SESSION_ID_GENERATE)
+        // Max volume — earpiece defaults can be very quiet
+        track.setVolume(AudioTrack.getMaxVolume())
+        btPlayer = track
         btPlayer?.play()
 
+        // Boost stream volume to maximum so the earpiece is as loud as possible
+        audioManager?.setStreamVolume(
+            AudioManager.STREAM_VOICE_CALL,
+            audioManager?.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL) ?: 0,
+            0)
+
         // Capture thread: mic on Poco → send to server (server plays to remote caller)
+        // Smaller buffer = less capture latency (2× min instead of 4×)
         val minIn = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
-        val inBuf = maxOf(minIn * 2, FRAME_BYTES * 4)
+        val inBuf = maxOf(minIn * 2, FRAME_BYTES * 2)
         sendThread = Thread {
             var recorder: AudioRecord? = null
             try {

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="@color/bg_key_ripple">
+    android:color="#1416A34A">
     <item>
         <shape android:shape="oval">
-            <solid android:color="@color/bg_key" />
+            <solid android:color="@color/brand_green" />
+            <size android:width="72dp" android:height="72dp" />
         </shape>
     </item>
 </ripple>
