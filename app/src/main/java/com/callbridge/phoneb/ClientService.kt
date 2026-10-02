@@ -97,9 +97,18 @@ class ClientService : Service() {
                 }
             }
             event.startsWith("CALLLOG|") -> CallLogStore.update(event.removePrefix("CALLLOG|"))
-            event.startsWith("UPLINK_MODE|") ->
-                getSharedPreferences("callbridge", Context.MODE_PRIVATE).edit()
-                    .putString("uplink_mode", event.removePrefix("UPLINK_MODE|")).apply()
+            event.startsWith("AUDIOPROBE|") -> {
+                val text = try {
+                    String(android.util.Base64.decode(event.removePrefix("AUDIOPROBE|"), android.util.Base64.NO_WRAP))
+                } catch (e: Exception) { "decode error: ${e.message}" }
+                copyToClipboard(text)
+                val n = buildNotifBuilder(CHANNEL_ID).setOngoing(false).setAutoCancel(true)
+                    .setContentTitle("Audio check copied to clipboard")
+                    .setContentText("Paste it to Claude")
+                    .setStyle(Notification.BigTextStyle().bigText(text.take(4000)))
+                    .build()
+                getSystemService(NotificationManager::class.java)?.notify(77, n)
+            }
             event.startsWith("CONTACTS|") -> ContactsStore.update(event.removePrefix("CONTACTS|"))
             event.startsWith("DIAL_FAIL|") -> broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
         }

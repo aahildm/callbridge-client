@@ -52,25 +52,13 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             PopupPermissionHelper.showPopupPermissionGuide(requireActivity())
         }
 
-        val btnUplinkMode = view.findViewById<Button>(R.id.btnUplinkMode)
-        val prefs = requireContext().getSharedPreferences("callbridge", android.content.Context.MODE_PRIVATE)
-        fun renderUplink() {
-            val mode = prefs.getString("uplink_mode", "speaker")
-            btnUplinkMode.text = if (mode == "tx") "🎙 Voice to caller: Direct (tap for Speaker)"
-                                 else "🎙 Voice to caller: Speaker (tap for Direct)"
-        }
-        renderUplink()
-        TransportManager.send("GET_UPLINK_MODE")
-        btnUplinkMode.setOnClickListener {
+        view.findViewById<Button>(R.id.btnAudioProbe).setOnClickListener {
             if (!TransportManager.isConnected()) {
                 Toast.makeText(requireContext(), "Not connected", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val next = if (prefs.getString("uplink_mode", "speaker") == "tx") "speaker" else "tx"
-            prefs.edit().putString("uplink_mode", next).apply()
-            TransportManager.send("UPLINK_MODE|$next")
-            renderUplink()
-            Toast.makeText(requireContext(), "Switched — applies instantly, even mid-call", Toast.LENGTH_SHORT).show()
+            TransportManager.send("AUDIO_PROBE")
+            Toast.makeText(requireContext(), "Running… result will be copied to clipboard", Toast.LENGTH_LONG).show()
         }
 
         btnRestartApp.setOnClickListener {
