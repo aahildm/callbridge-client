@@ -8,7 +8,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Button
+import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -41,19 +41,23 @@ class MainActivity : AppCompatActivity() {
                 status.startsWith("CONNECTED|") -> {
                     val transport = status.removePrefix("CONNECTED|")
                     tvStatus.text = "✅ Connected to Phone A"
-                    tvTransport.text = when (transport) {
+                    val transportText = when (transport) {
                         "WiFi" -> "📶 WiFi  (audio + control)"
                         "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
                         else -> ""
                     }
+                    tvTransport.text = transportText
+                    tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
                 }
                 status == "DISCONNECTED" -> {
                     tvStatus.text = "🔴 Disconnected"
                     tvTransport.text = ""
+                    tvTransport.visibility = View.GONE
                 }
                 else -> {
                     tvStatus.text = status
                     tvTransport.text = ""
+                    tvTransport.visibility = View.GONE
                 }
             }
         }
@@ -66,13 +70,15 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tvStatus)
         tvTransport = findViewById(R.id.tvTransport)
 
-        val tabDialer = findViewById<Button>(R.id.tabDialer)
-        val tabCallLog = findViewById<Button>(R.id.tabCallLog)
-        val tabSms = findViewById<Button>(R.id.tabSms)
-        val tabSettings = findViewById<Button>(R.id.tabSettings)
+        val tabDialer = findViewById<android.widget.LinearLayout>(R.id.tabDialer)
+        val tabCallLog = findViewById<android.widget.LinearLayout>(R.id.tabCallLog)
+        val tabContacts = findViewById<android.widget.LinearLayout>(R.id.tabContacts)
+        val tabSms = findViewById<android.widget.LinearLayout>(R.id.tabSms)
+        val tabSettings = findViewById<android.widget.LinearLayout>(R.id.tabSettings)
 
         tabDialer.setOnClickListener { showFragment(DialerFragment()) }
         tabCallLog.setOnClickListener { showFragment(CallLogFragment()) }
+        tabContacts.setOnClickListener { showFragment(ContactsFragment()) }
         tabSms.setOnClickListener { startActivity(Intent(this, SmsActivity::class.java)) }
         tabSettings.setOnClickListener { showFragment(SettingsFragment()) }
 
@@ -110,11 +116,13 @@ class MainActivity : AppCompatActivity() {
 
         if (TransportManager.isConnected()) {
             tvStatus.text = "✅ Connected to Phone A"
-            tvTransport.text = when (TransportManager.activeTransportName()) {
+            val transportText = when (TransportManager.activeTransportName()) {
                 "WiFi" -> "📶 WiFi  (audio + control)"
                 "Bluetooth" -> "🔵 Bluetooth  (audio + control)"
                 else -> ""
             }
+            tvTransport.text = transportText
+            tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
         }
 
         if (!batteryDialogShown && PermissionHelper.isBatteryOptimized(this)) {

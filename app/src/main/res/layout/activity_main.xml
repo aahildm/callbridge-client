@@ -2,22 +2,30 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="#F5F5F5">
 
-    <!-- Connection status bar -->
+    <!-- Status bar -->
     <LinearLayout
+        android:id="@+id/statusBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp"
-        android:background="#F0F0F0">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:background="#FFFFFF"
+        android:elevation="2dp">
 
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:gravity="center" />
+            android:textSize="13sp"
+            android:textColor="#212121"
+            android:gravity="center"
+            android:text="Connecting..." />
 
         <TextView
             android:id="@+id/tvTransport"
@@ -25,56 +33,74 @@
             android:layout_height="wrap_content"
             android:textSize="11sp"
             android:gravity="center"
-            android:textColor="#888888" />
+            android:textColor="#757575"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Tab content area -->
+    <!-- Tab content -->
     <FrameLayout
         android:id="@+id/tabContent"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Bottom tab bar -->
+    <!-- Bottom nav -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:orientation="horizontal"
         android:background="#FFFFFF"
         android:elevation="8dp">
 
-        <Button
-            android:id="@+id/tabDialer"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="⌨️ Dialer"
-            android:background="?attr/selectableItemBackground" />
+        <LinearLayout android:id="@+id/tabDialer"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:gravity="center" android:background="?attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⌨" android:textSize="20sp" android:gravity="center"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Dialer" android:textSize="10sp" android:textColor="#757575"/>
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/tabCallLog"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📋 Calls"
-            android:background="?attr/selectableItemBackground" />
+        <LinearLayout android:id="@+id/tabCallLog"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:gravity="center" android:background="?attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📋" android:textSize="20sp" android:gravity="center"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Calls" android:textSize="10sp" android:textColor="#757575"/>
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/tabSms"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📩 SMS"
-            android:background="?attr/selectableItemBackground" />
+        <LinearLayout android:id="@+id/tabContacts"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:gravity="center" android:background="?attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="👥" android:textSize="20sp" android:gravity="center"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Contacts" android:textSize="10sp" android:textColor="#757575"/>
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/tabSettings"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="⚙️ Setup"
-            android:background="?attr/selectableItemBackground" />
+        <LinearLayout android:id="@+id/tabSms"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:gravity="center" android:background="?attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="💬" android:textSize="20sp" android:gravity="center"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SMS" android:textSize="10sp" android:textColor="#757575"/>
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/tabSettings"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:gravity="center" android:background="?attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⚙" android:textSize="20sp" android:gravity="center"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Setup" android:textSize="10sp" android:textColor="#757575"/>
+        </LinearLayout>
 
     </LinearLayout>
-
 </LinearLayout>

@@ -67,6 +67,9 @@ class ClientService : Service() {
                 AudioClient.start()
                 CallStateStore.update("ACTIVE")
                 getSystemService(NotificationManager::class.java)?.cancel(CALL_NOTIF_ID)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    TransportManager.send("GET_UPLINK_STATUS")
+                }, 1000)
             }
             event == "STATE|HOLDING" -> CallStateStore.update("HOLDING")
             event == "ENDED" -> {
@@ -93,6 +96,7 @@ class ClientService : Service() {
                 }
             }
             event.startsWith("CALLLOG|") -> CallLogStore.update(event.removePrefix("CALLLOG|"))
+            event.startsWith("CONTACTS|") -> ContactsStore.update(event.removePrefix("CONTACTS|"))
             event.startsWith("DIAL_FAIL|") -> broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
         }
     }
