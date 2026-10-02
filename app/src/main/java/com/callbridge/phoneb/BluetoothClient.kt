@@ -65,8 +65,13 @@ object BluetoothClient {
     @SuppressLint("MissingPermission")
     @Synchronized
     fun connect(): Boolean {
-        // Never tear down a live or in-progress connection
-        if (isConnected() || connecting) return true
+        // Already fully connected — re-fire CONNECTED so UI/notification sync up
+        if (isConnected()) {
+            onEvent?.invoke("CONNECTED")
+            return true
+        }
+        // Connection attempt already in progress — don't start another
+        if (connecting) return true
         disconnect()
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {

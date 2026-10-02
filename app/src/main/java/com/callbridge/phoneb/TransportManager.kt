@@ -21,8 +21,11 @@ object TransportManager {
 
     fun connect(ip: String = "") {
         Log.d(TAG, "Connecting via Bluetooth")
-        val serverName = BluetoothClient.getSavedDeviceName() ?: "Phone A"
-        onEvent?.invoke("STATUS|Connecting to $serverName...")
+        // Don't show "Connecting..." if already connected — BluetoothClient will re-fire CONNECTED
+        if (!BluetoothClient.isConnected()) {
+            val serverName = BluetoothClient.getSavedDeviceName() ?: "Phone A"
+            onEvent?.invoke("STATUS|Connecting to $serverName...")
+        }
         val ok = BluetoothClient.connect()
         // BluetoothClient.connect() returns true when it queued a background connect attempt;
         // only fire DISCONNECTED if it truly couldn't start (no adapter, BT off, etc.)
