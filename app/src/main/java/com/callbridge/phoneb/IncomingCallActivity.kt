@@ -79,6 +79,7 @@ class IncomingCallActivity : AppCompatActivity() {
         setContentView(R.layout.activity_incoming_call)
 
         callerNumber = intent.getStringExtra("caller_number") ?: "Unknown"
+        val callerName = intent.getStringExtra("caller_name") ?: ""
         isOutgoing = intent.getBooleanExtra("outgoing", false)
 
         val tvCaller = findViewById<TextView>(R.id.tvCaller)
@@ -92,7 +93,13 @@ class IncomingCallActivity : AppCompatActivity() {
         btnSpeaker = findViewById(R.id.btnSpeaker)
         btnHold = findViewById(R.id.btnHold)
 
-        tvCaller.text = callerNumber
+        // Show name if known, number below; or just number if no contact found
+        if (callerName.isNotBlank()) {
+            tvCaller.text = callerName
+            tvCallStatus.text = callerNumber
+        } else {
+            tvCaller.text = callerNumber
+        }
 
         if (isOutgoing) {
             tvCallLabel.text = "📞 CALLING"
@@ -100,7 +107,8 @@ class IncomingCallActivity : AppCompatActivity() {
             btnAnswer.visibility = View.GONE
             btnReject.text = "Cancel"
         } else {
-            tvCallStatus.text = "Incoming call from Phone A"
+            // If name is known, tvCallStatus already shows the number; don't overwrite
+            if (callerName.isBlank()) tvCallStatus.text = "Incoming call from Phone A"
             RingtoneHelper.startRinging(this)
         }
 
@@ -208,7 +216,13 @@ class IncomingCallActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         if (intent?.action == "INCOMING_CALL") {
             callerNumber = intent.getStringExtra("caller_number") ?: "Unknown"
-            findViewById<TextView>(R.id.tvCaller)?.text = callerNumber
+            val name = intent.getStringExtra("caller_name") ?: ""
+            if (name.isNotBlank()) {
+                findViewById<TextView>(R.id.tvCaller)?.text = name
+                tvCallStatus.text = callerNumber
+            } else {
+                findViewById<TextView>(R.id.tvCaller)?.text = callerNumber
+            }
             RingtoneHelper.startRinging(this)
         }
     }

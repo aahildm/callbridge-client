@@ -5,6 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -50,10 +53,14 @@ class ClientService : Service() {
                 }, 5000)
             }
             event.startsWith("RING|") -> {
-                val number = event.removePrefix("RING|")
+                // Protocol: RING|number|name  (name may be empty for unknown callers)
+                val payload = event.removePrefix("RING|")
+                val pipeIdx = payload.indexOf('|')
+                val number = if (pipeIdx >= 0) payload.substring(0, pipeIdx) else payload
+                val name = if (pipeIdx >= 0) payload.substring(pipeIdx + 1) else ""
                 CallStateStore.setCall(number, outgoing = false)
                 CallStateStore.update("RINGING")
-                showIncomingCallNotification(number)
+                showIncomingCallNotification(number, name)
             }
             event == "STATE|DIALING" -> CallStateStore.update("DIALING")
             event == "STATE|ACTIVE" -> {
@@ -76,7 +83,13 @@ class ClientService : Service() {
                     val msg = SmsStore.Message(sender = parts[0], body = parts[2],
                         timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(), incoming = true)
                     SmsStore.add(msg)
-                    showSmsNotification(msg)
+                    val otp = extractOtp(msg.body)
+                    if (otp != null) {
+                        copyToClipboard(otp)
+                        showOtpNotification(msg.sender, otp, msg.body)
+                    } else {
+                        showSmsNotification(msg)
+                    }
                 }
             }
             event.startsWith("CALLLOG|") -> CallLogStore.update(event.removePrefix("CALLLOG|"))
@@ -88,30 +101,81 @@ class ClientService : Service() {
         sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply { putExtra("status", status) })
     }
 
-    private fun showIncomingCallNotification(number: String) {
+    private fun showIncomingCallNotification(number: String, name: String = "") {
         if (Build.VERSION.SDK_INT >= 34) {
             val nm = getSystemService(NotificationManager::class.java)
             if (nm?.canUseFullScreenIntent() == false) broadcastStatus("⚠️ Call popup blocked — enable in Setup tab")
         }
+        val displayLabel = name.ifBlank { number }
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            putExtra("caller_number", number); action = "INCOMING_CALL"
+            putExtra("caller_number", number)
+            putExtra("caller_name", name)
+            action = "INCOMING_CALL"
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val fsPendingIntent = PendingIntent.getActivity(this, 0, fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CALL_CHANNEL_ID).setContentTitle("Incoming call").setContentText(number)
+            Notification.Builder(this, CALL_CHANNEL_ID).setContentTitle("Incoming call")
+                .setContentText(displayLabel)
                 .setSmallIcon(android.R.drawable.ic_menu_call).setPriority(Notification.PRIORITY_MAX)
                 .setCategory(Notification.CATEGORY_CALL).setFullScreenIntent(fsPendingIntent, true)
                 .setContentIntent(fsPendingIntent).setOngoing(true).build()
         } else {
             @Suppress("DEPRECATION")
-            Notification.Builder(this).setContentTitle("Incoming call").setContentText(number)
+            Notification.Builder(this).setContentTitle("Incoming call").setContentText(displayLabel)
                 .setSmallIcon(android.R.drawable.ic_menu_call).setPriority(Notification.PRIORITY_MAX)
                 .setFullScreenIntent(fsPendingIntent, true).setContentIntent(fsPendingIntent).setOngoing(true).build()
         }
         getSystemService(NotificationManager::class.java)?.notify(CALL_NOTIF_ID, notif)
         try { startActivity(fullScreenIntent) } catch (e: Exception) { Log.e(TAG, "Direct launch failed: ${e.message}") }
+    }
+
+    /** Extract a 4-8 digit OTP from an SMS body. Returns null if none found. */
+    private fun extractOtp(body: String): String? {
+        // Explicit keyword match first: "OTP", "code", "pin", "verify"
+        val keywordPattern = Regex(
+            """(?i)(?:otp|one.?time|verification\s+code|verify(?:ication)?\s+code|pin|passcode)[^\d]{0,15}(\d{4,8})""")
+        keywordPattern.find(body)?.groupValues?.get(1)?.let { return it }
+
+        // Generic: a standalone 4-8 digit block (not part of a longer number)
+        val genericPattern = Regex("""(?<!\d)(\d{4,8})(?!\d)""")
+        val matches = genericPattern.findAll(body).map { it.groupValues[1] }.toList()
+        // Prefer 6-digit codes (most common OTP length), else first match
+        return matches.firstOrNull { it.length == 6 } ?: matches.firstOrNull()
+    }
+
+    private fun copyToClipboard(text: String) {
+        try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            cm?.setPrimaryClip(ClipData.newPlainText("OTP", text))
+            Log.d(TAG, "OTP copied to clipboard: $text")
+        } catch (e: Exception) {
+            Log.e(TAG, "Clipboard copy failed: ${e.message}")
+        }
+    }
+
+    private fun showOtpNotification(sender: String, otp: String, fullBody: String) {
+        val pi = PendingIntent.getActivity(this, 0, Intent(this, SmsActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("🔑 OTP: $otp  (copied!)")
+                .setContentText("From $sender • $fullBody")
+                .setStyle(Notification.BigTextStyle().bigText(fullBody))
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setContentIntent(pi).setAutoCancel(true)
+                .setPriority(Notification.PRIORITY_HIGH).build()
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+                .setContentTitle("🔑 OTP: $otp  (copied!)")
+                .setContentText("From $sender • $fullBody")
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setContentIntent(pi).setAutoCancel(true)
+                .setPriority(Notification.PRIORITY_HIGH).build()
+        }
+        getSystemService(NotificationManager::class.java)?.notify(sender.hashCode(), notif)
     }
 
     private fun showSmsNotification(msg: SmsStore.Message) {
