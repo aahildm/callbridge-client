@@ -3,7 +3,6 @@ package com.callbridge.phoneb
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
 import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.TextView
@@ -20,7 +19,7 @@ class DialerFragment : Fragment(R.layout.fragment_dialer) {
 
         tvNumber     = view.findViewById(R.id.tvDialNumber)
         btnBackspace = view.findViewById(R.id.btnBackspace)
-        val btnCall  = view.findViewById<Button>(R.id.btnCall)
+        val btnCall  = view.findViewById<ImageButton>(R.id.btnCall)
         val tvStatus = view.findViewById<TextView>(R.id.tvDialStatus)
         val gridKeys = view.findViewById<GridLayout>(R.id.gridKeys)
 
