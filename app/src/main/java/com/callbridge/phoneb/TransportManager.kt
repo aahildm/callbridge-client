@@ -1,5 +1,7 @@
 package com.callbridge.phoneb
 
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.util.Log
 
@@ -12,9 +14,15 @@ object TransportManager {
         BluetoothClient.onEvent = { event -> onEvent?.invoke(event) }
     }
 
+    @SuppressLint("MissingPermission")
+    private fun localName(): String =
+        try { BluetoothAdapter.getDefaultAdapter()?.name ?: "this phone" }
+        catch (e: Exception) { "this phone" }
+
     fun connect(ip: String = "") {
         Log.d(TAG, "Connecting via Bluetooth")
-        onEvent?.invoke("STATUS|Connecting to Phone A...")
+        val serverName = BluetoothClient.getSavedDeviceName() ?: "Phone A"
+        onEvent?.invoke("STATUS|Connecting to $serverName...")
         val ok = BluetoothClient.connect()
         // BluetoothClient.connect() returns true when it queued a background connect attempt;
         // only fire DISCONNECTED if it truly couldn't start (no adapter, BT off, etc.)

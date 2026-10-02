@@ -103,12 +103,12 @@ class IncomingCallActivity : AppCompatActivity() {
 
         if (isOutgoing) {
             tvCallLabel.text = "📞 CALLING"
-            tvCallStatus.text = "Dialing via Phone A..."
+            tvCallStatus.text = "Dialing via ${BluetoothClient.getSavedDeviceName() ?: "Phone A"}..."
             btnAnswer.visibility = View.GONE
             btnReject.text = "Cancel"
         } else {
             // If name is known, tvCallStatus already shows the number; don't overwrite
-            if (callerName.isBlank()) tvCallStatus.text = "Incoming call from Phone A"
+            if (callerName.isBlank()) tvCallStatus.text = "Incoming call"
             RingtoneHelper.startRinging(this)
         }
 

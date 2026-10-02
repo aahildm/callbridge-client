@@ -40,7 +40,7 @@ class ClientService : Service() {
                 broadcastStatus(msg)
             }
             event == "CONNECTED" -> {
-                updateNotification("✅ Connected via Bluetooth")
+                updateNotification("✅ Connected to ${BluetoothClient.getSavedDeviceName() ?: "Phone A"}")
                 broadcastStatus("CONNECTED|Bluetooth")
                 TransportManager.send("GET_CALLLOG")
             }
