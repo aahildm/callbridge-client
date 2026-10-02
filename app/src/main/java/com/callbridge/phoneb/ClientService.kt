@@ -37,7 +37,8 @@ class ClientService : Service() {
             event.startsWith("STATUS|") -> {
                 val msg = event.removePrefix("STATUS|")
                 updateNotification(msg)
-                broadcastStatus(msg)
+                // Audio diagnostics go to the notification only, not the connection pill
+                if (!msg.startsWith("Uplink:") && !msg.startsWith("Downlink")) broadcastStatus(msg)
             }
             event == "CONNECTED" -> {
                 updateNotification("✅ Connected to ${BluetoothClient.getSavedDeviceName() ?: "Phone A"}")
