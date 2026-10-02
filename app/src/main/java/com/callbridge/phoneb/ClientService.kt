@@ -115,6 +115,7 @@ class ClientService : Service() {
     }
 
     private fun broadcastStatus(status: String) {
+        LastStatus.value = status
         sendBroadcast(Intent("com.callbridge.phoneb.STATUS").apply { putExtra("status", status) })
     }
 
@@ -245,3 +246,6 @@ class ClientService : Service() {
         .setContentIntent(buildMainIntent())
         .build()
 }
+
+/** Last connection status, so screens opened later can show the truth instead of a placeholder. */
+object LastStatus { @Volatile var value: String = "" }

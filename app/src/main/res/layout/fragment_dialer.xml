@@ -88,25 +88,22 @@
     </GridLayout>
 
     <!-- Call button row -->
-    <RelativeLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="10dp"
+        android:paddingTop="12dp"
         android:paddingBottom="20dp">
 
         <ImageButton
             android:id="@+id/btnCall"
             android:layout_width="72dp"
             android:layout_height="72dp"
-            android:layout_centerInParent="true"
-            android:src="@android:drawable/ic_menu_call"
-            android:tint="#FFFFFF"
-            android:background="@drawable/bg_call_btn"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_call"
+            android:background="@drawable/bg_btn_answer"
             android:contentDescription="Call"
             android:scaleType="center" />
 
-    </RelativeLayout>
+    </FrameLayout>
 
 </LinearLayout>

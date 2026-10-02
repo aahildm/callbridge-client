@@ -43,27 +43,30 @@ class MainActivity : AppCompatActivity() {
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val status = intent.getStringExtra("status") ?: return
-            when {
-                status.startsWith("CONNECTED|") -> {
-                    val transport = status.removePrefix("CONNECTED|")
-                    setStatusPill("Connected", StatusType.CONNECTED)
-                    val transportText = when (transport) {
-                        "WiFi"      -> "📶  Wi-Fi  ·  audio + control"
-                        "Bluetooth" -> "🔵  Bluetooth  ·  audio + control"
-                        else        -> ""
-                    }
-                    tvTransport.text = transportText
-                    tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
+            applyStatus(intent.getStringExtra("status") ?: return)
+        }
+    }
+
+    private fun applyStatus(status: String) {
+        when {
+            status.startsWith("CONNECTED|") -> {
+                val transport = status.removePrefix("CONNECTED|")
+                setStatusPill("Connected", StatusType.CONNECTED)
+                val transportText = when (transport) {
+                    "WiFi"      -> "📶  Wi-Fi  ·  audio + control"
+                    "Bluetooth" -> "🔵  Bluetooth  ·  audio + control"
+                    else        -> ""
                 }
-                status == "DISCONNECTED" -> {
-                    setStatusPill("Disconnected", StatusType.DISCONNECTED)
-                    tvTransport.visibility = View.GONE
-                }
-                else -> {
-                    setStatusPill(status.removePrefix("STATUS|"), StatusType.CONNECTING)
-                    tvTransport.visibility = View.GONE
-                }
+                tvTransport.text = transportText
+                tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
+            }
+            status == "DISCONNECTED" -> {
+                setStatusPill("Disconnected", StatusType.DISCONNECTED)
+                tvTransport.visibility = View.GONE
+            }
+            else -> {
+                setStatusPill(status.removePrefix("STATUS|"), StatusType.CONNECTING)
+                tvTransport.visibility = View.GONE
             }
         }
     }
@@ -150,15 +153,10 @@ class MainActivity : AppCompatActivity() {
             registerReceiver(statusReceiver, filter)
         }
 
-        if (TransportManager.isConnected()) {
-            setStatusPill("Connected", StatusType.CONNECTED)
-            val transportText = when (TransportManager.activeTransportName()) {
-                "WiFi"      -> "📶  Wi-Fi  ·  audio + control"
-                "Bluetooth" -> "🔵  Bluetooth  ·  audio + control"
-                else        -> ""
-            }
-            tvTransport.text = transportText
-            tvTransport.visibility = if (transportText.isNotBlank()) View.VISIBLE else View.GONE
+        when {
+            TransportManager.isConnected() -> applyStatus("CONNECTED|Bluetooth")
+            LastStatus.value.isNotBlank() -> applyStatus(LastStatus.value)
+            else -> applyStatus("DISCONNECTED")
         }
 
         if (!batteryDialogShown && PermissionHelper.isBatteryOptimized(this)) {
