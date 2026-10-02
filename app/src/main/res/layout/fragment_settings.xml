@@ -45,6 +45,15 @@
         android:layout_marginBottom="10dp" />
 
     <Button
+        android:id="@+id/btnUplinkMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎙 Voice to caller: Speaker mode"
+        android:backgroundTint="#2563EB"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="10dp" />
+
+    <Button
         android:id="@+id/btnRestartApp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

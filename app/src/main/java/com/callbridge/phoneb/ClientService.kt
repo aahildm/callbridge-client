@@ -97,6 +97,9 @@ class ClientService : Service() {
                 }
             }
             event.startsWith("CALLLOG|") -> CallLogStore.update(event.removePrefix("CALLLOG|"))
+            event.startsWith("UPLINK_MODE|") ->
+                getSharedPreferences("callbridge", Context.MODE_PRIVATE).edit()
+                    .putString("uplink_mode", event.removePrefix("UPLINK_MODE|")).apply()
             event.startsWith("CONTACTS|") -> ContactsStore.update(event.removePrefix("CONTACTS|"))
             event.startsWith("DIAL_FAIL|") -> broadcastStatus("Dial failed: ${event.removePrefix("DIAL_FAIL|")}")
         }
