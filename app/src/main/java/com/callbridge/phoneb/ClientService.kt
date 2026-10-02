@@ -16,12 +16,14 @@ class ClientService : Service() {
     private val CALL_CHANNEL_ID = "callbridge_incoming_call"
     private val NOTIF_ID = 2
     private val CALL_NOTIF_ID = 3
+    private val retryHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
         startForeground(NOTIF_ID, buildNotification("Starting..."))
         TransportManager.init(this)
+        AudioClient.init(this)
         TransportManager.onEvent = { event -> handleEvent(event) }
         TransportManager.connect()
     }
@@ -42,8 +44,9 @@ class ClientService : Service() {
             event == "DISCONNECTED" -> {
                 updateNotification("🔴 Disconnected — retrying...")
                 broadcastStatus("DISCONNECTED")
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    TransportManager.connect()
+                retryHandler.removeCallbacksAndMessages(null)
+                retryHandler.postDelayed({
+                    if (!TransportManager.isConnected()) TransportManager.connect()
                 }, 5000)
             }
             event.startsWith("RING|") -> {

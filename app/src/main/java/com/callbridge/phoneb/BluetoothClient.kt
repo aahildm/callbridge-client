@@ -24,6 +24,8 @@ object BluetoothClient {
     private var authenticated = false
     private var readThread: Thread? = null
     private var connectThread: Thread? = null
+    @Volatile private var connecting = false
+    @Volatile private var generation = 0
 
     var onEvent: ((String) -> Unit)? = null
     /** Called when no saved device is set and user must pick one from the list */
@@ -61,7 +63,10 @@ object BluetoothClient {
     }
 
     @SuppressLint("MissingPermission")
+    @Synchronized
     fun connect(): Boolean {
+        // Never tear down a live or in-progress connection
+        if (isConnected() || connecting) return true
         disconnect()
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {
@@ -88,6 +93,8 @@ object BluetoothClient {
 
         onEvent?.invoke("STATUS|Connecting to ${device.name} via Bluetooth...")
 
+        val myGen = ++generation
+        connecting = true
         connectThread = Thread {
             try {
                 adapter.cancelDiscovery()
@@ -99,8 +106,11 @@ object BluetoothClient {
                 Log.d(TAG, "BT connected to ${device.name} — authenticating")
                 onEvent?.invoke("STATUS|Connected to ${device.name} — authenticating...")
                 sendRaw("AUTH|$SECRET")
-                startReadLoop(s)
+                connecting = false
+                startReadLoop(s, myGen)
             } catch (e: Exception) {
+                connecting = false
+                if (myGen != generation) return@Thread
                 Log.e(TAG, "Bluetooth connect failed: ${e.message}")
                 onEvent?.invoke("STATUS|Connect to ${device?.name} failed: ${e.message ?: "unknown error"}")
                 onEvent?.invoke("DISCONNECTED")
@@ -110,7 +120,7 @@ object BluetoothClient {
         return true
     }
 
-    private fun startReadLoop(s: BluetoothSocket) {
+    private fun startReadLoop(s: BluetoothSocket, myGen: Int) {
         readThread = Thread {
             try {
                 val reader = BufferedReader(InputStreamReader(s.inputStream))
@@ -121,8 +131,13 @@ object BluetoothClient {
             } catch (e: Exception) {
                 Log.d(TAG, "Read loop ended: ${e.message}")
             } finally {
-                authenticated = false
-                onEvent?.invoke("DISCONNECTED")
+                // Only report a drop if this is still the current connection
+                if (myGen == generation) {
+                    authenticated = false
+                    try { s.close() } catch (_: Exception) {}
+                    socket = null; out = null
+                    onEvent?.invoke("DISCONNECTED")
+                }
             }
         }
         readThread?.start()
@@ -151,6 +166,7 @@ object BluetoothClient {
         }
     }
 
+    @Synchronized
     private fun sendRaw(message: String) {
         try {
             out?.write((message + "\n").toByteArray())
@@ -163,6 +179,8 @@ object BluetoothClient {
     fun send(message: String) = sendRaw(message)
 
     fun disconnect() {
+        generation++
+        connecting = false
         try { socket?.close() } catch (_: Exception) {}
         socket = null
         out = null

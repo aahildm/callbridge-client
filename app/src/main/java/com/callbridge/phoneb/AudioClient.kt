@@ -27,6 +27,13 @@ object AudioClient {
     private var noiseSuppressor: NoiseSuppressor? = null
     private var agc: AutomaticGainControl? = null
 
+    private var audioManager: AudioManager? = null
+    private var prevMode = AudioManager.MODE_NORMAL
+
+    fun init(context: android.content.Context) {
+        audioManager = context.applicationContext.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
+    }
+
     fun setMuted(mute: Boolean) { muted = mute }
 
     fun onBluetoothAudio(base64Chunk: String) {
@@ -41,6 +48,7 @@ object AudioClient {
         if (running) return
         running = true
         Log.d(TAG, "Starting audio over Bluetooth")
+        audioManager?.let { prevMode = it.mode; it.mode = AudioManager.MODE_IN_COMMUNICATION }
         val outBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_OUT, ENCODING)
         btPlayer = AudioTrack(
             AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
@@ -87,6 +95,7 @@ object AudioClient {
     }
 
     fun stop() {
+        if (running) audioManager?.mode = prevMode
         running = false; muted = false
         btPlayer?.stop(); btPlayer?.release(); btPlayer = null
         sendThread?.interrupt(); sendThread = null
